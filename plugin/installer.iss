@@ -88,8 +88,9 @@ Filename: "{dotnet4064}\RegAsm.exe"; Parameters: "/unregister ""{app}\{#MyAppExe
 Filename: "{dotnet4032}\RegAsm.exe"; Parameters: "/unregister ""{app}\{#MyAppExeName}"""; Flags: runhidden; Check: not IsWin64
 
 [UninstallDelete]
-; 清理服务运行时产生的日志/配置
+; 清理服务运行时产生的日志/配置（含 %APPDATA% 下的 config.json，里面有用户 API Key）
 Type: filesandordirs; Name: "{localappdata}\MechForge"
+Type: filesandordirs; Name: "{userappdata}\MechForge"
 Type: filesandordirs; Name: "{app}"
 
 [Code]

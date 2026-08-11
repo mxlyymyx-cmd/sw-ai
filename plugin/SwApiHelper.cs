@@ -204,7 +204,16 @@ namespace MechForge
                     tempPath = Path.Combine(Path.GetTempPath(), "MechForge_TempMacro.bas");
                 }
 
-                File.WriteAllText(tempPath, code, System.Text.Encoding.UTF8);
+                // 强制声明模块名为 Module1（VBA 从 .bas 导入时模块名默认取文件名，
+                // 与 RunMacro2 的模块参数不一致会导致找不到模块而执行失败）
+                string trimmed = code.TrimStart();
+                if (!trimmed.StartsWith("Attribute VB_Name", StringComparison.OrdinalIgnoreCase))
+                {
+                    code = "Attribute VB_Name = \"Module1\"\r\n" + code;
+                }
+
+                // 用 ANSI/系统代码页写入（VBA 按 ANSI 读取 .bas，UTF-8 会导致中文注释乱码）
+                File.WriteAllText(tempPath, code, System.Text.Encoding.Default);
 
                 // 现代 API：RunMacro2(FilePath, Module, Proc, Options, out Error)
                 int macroError = 0;
