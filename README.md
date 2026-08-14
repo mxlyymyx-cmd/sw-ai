@@ -100,31 +100,12 @@ C# SolidWorks Add-in，与 API 服务通信：
 
 ## 安装
 
-### Windows 预编译版（推荐）
-从 [Actions 页面](https://github.com/mxlyymyx-cmd/mech-forge/actions) 下载 `MechForge-win64.zip`：
-1. 下载解压
-2. 打开命令行到目录
-3. 直接运行：`MechForge.exe query DN100 PN16`
+1. 下载 `MechForge-Setup-1.0.0.exe` 双击安装（自动注册插件 + 安装 AI 服务）
+2. 安装完自动打开 **MechForge 聊天窗口**（或双击桌面"MechForge"图标）
+3. 在聊天窗口点 **⚙ 设置** 填入 DeepSeek API Key（可选，不填也能用降级模式）
+4. 在 SolidWorks 中：**工具 → 插件 → 勾选 MechForge Addin**，右侧任务面板同样可以对话
 
-**不需要安装 Python，解压即用。**
-
-### 源码运行（Linux/Mac/Windows）
-```bash
-git clone https://github.com/mxlyymyx-cmd/mech-forge.git
-cd mech-forge
-pip install -r requirements.txt
-python main.py --help
-```
-
-### 使用 SolidWorks 插件（Windows only）
-```bash
-pip install -r requirements-plugin.txt
-python api.py --port 5757 &
-cd plugin
-.\install.ps1  # 管理员 PowerShell
-```
-
----
+> 聊天窗口会自动启动后台 AI 服务（无黑窗口），SolidWorks 插件与聊天窗口共用同一个服务。
 
 ## 架构
 

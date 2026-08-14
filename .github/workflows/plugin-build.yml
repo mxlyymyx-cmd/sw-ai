@@ -109,19 +109,34 @@ jobs:
           pip install -r requirements-plugin.txt
           pip install pyinstaller
 
-      - name: 📦 打包 Python API 服务为独立 exe
+      - name: 📦 打包 Python API 服务为独立 exe（静默后台，无黑窗口）
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          # --onefile 单文件模式：用户无需安装 Python
-          pyinstaller --onefile --name MechForgeServer --clean --noconfirm `
+          # --onefile 单文件模式 + --noconsole 隐藏控制台窗口（服务静默后台运行）
+          pyinstaller --onefile --noconsole --name MechForgeServer --clean --noconfirm `
             --hidden-import flask --hidden-import flask_cors --hidden-import requests `
             api.py
           if (!(Test-Path "dist\MechForgeServer.exe")) {
-            Write-Host "❌ PyInstaller 打包失败"
+            Write-Host "❌ PyInstaller 打包 MechForgeServer 失败"
             exit 1
           }
           Write-Host "✅ MechForgeServer.exe 就绪: $((Get-Item 'dist\MechForgeServer.exe').Length / 1MB) MB"
+
+      - name: 💬 打包聊天窗口桌面应用（MechForgeChat.exe）
+        shell: pwsh
+        run: |
+          # 聊天 GUI：双击打开就是正常对话界面，自动拉起本地服务
+          pyinstaller --onefile --noconsole --name MechForgeChat --clean --noconfirm `
+            --hidden-import flask --hidden-import flask_cors --hidden-import requests `
+            --hidden-import api --hidden-import ai_chat `
+            --collect-submodules flange --collect-submodules impeller --collect-submodules axial `
+            chat_gui.py
+          if (!(Test-Path "dist\MechForgeChat.exe")) {
+            Write-Host "❌ PyInstaller 打包 MechForgeChat 失败"
+            exit 1
+          }
+          Write-Host "✅ MechForgeChat.exe 就绪: $((Get-Item 'dist\MechForgeChat.exe').Length / 1MB) MB"
 
       - name: 📦 安装 Inno Setup
         shell: pwsh

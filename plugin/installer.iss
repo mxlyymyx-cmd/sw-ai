@@ -34,7 +34,7 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
-UninstallDisplayIcon={app}\{#MyServerExeName}
+UninstallDisplayIcon={app}\MechForgeChat.exe
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoDescription=MechForge SolidWorks AI Plugin
 
@@ -49,8 +49,10 @@ Name: "autostart"; Description: "开机自动启动 MechForge AI 服务"; GroupD
 [Files]
 ; 预编译的插件 DLL（由 GitHub Actions 编译）
 Source: "bin\x64\Release\MechForgeAddin.dll"; DestDir: "{app}"; Flags: ignoreversion
-; PyInstaller 打包的 Python API 服务（用户无需安装 Python）
+; PyInstaller 打包的 Python API 服务（用户无需安装 Python，静默后台运行）
 Source: "..\dist\MechForgeServer.exe"; DestDir: "{app}"; Flags: ignoreversion
+; 聊天窗口桌面应用（双击即聊，自动拉起服务）
+Source: "..\dist\MechForgeChat.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; 说明文档
 Source: "README-install.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
@@ -70,17 +72,18 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{dotnet4064}\RegAsm.exe"; Parameters: "/codebase ""{app}\{#MyAppExeName}"""; Flags: runhidden; StatusMsg: "正在注册 COM 组件..."; Check: IsWin64
 Filename: "{dotnet4032}\RegAsm.exe"; Parameters: "/codebase ""{app}\{#MyAppExeName}"""; Flags: runhidden; StatusMsg: "正在注册 COM 组件..."; Check: not IsWin64
 
-; ── 立即启动 API 服务 ──
-Filename: "{app}\{#MyServerExeName}"; Description: "启动 MechForge AI 服务"; Flags: nowait postinstall skipifsilent
+; ── 立即启动聊天窗口（自动拉起后台服务）──
+Filename: "{app}\MechForgeChat.exe"; Description: "打开 MechForge 聊天窗口"; Flags: nowait postinstall skipifsilent
 
 ; ── 打开说明文档 ──
 Filename: "{app}\README-install.md"; Description: "查看使用说明"; Flags: postinstall nowait skipifsilent shellexec
 
 [Icons]
-Name: "{group}\启动 MechForge AI 服务"; Filename: "{app}\{#MyServerExeName}"
+Name: "{group}\MechForge 聊天窗口"; Filename: "{app}\MechForgeChat.exe"
+Name: "{group}\启动 AI 服务(后台)"; Filename: "{app}\{#MyServerExeName}"
 Name: "{group}\使用说明"; Filename: "{app}\README-install.md"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyServerExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\MechForgeChat.exe"; Tasks: desktopicon
 
 [UninstallRun]
 ; 注销 COM
