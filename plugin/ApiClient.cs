@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 
-namespace MechForge
+namespace SWAI
 {
     /// <summary>
     /// API 调用结果封装。
@@ -35,7 +35,7 @@ namespace MechForge
     }
 
     /// <summary>
-    /// MechForge API HTTP 客户端。
+    /// SWAI API HTTP 客户端。
     /// 
     /// 通过 HTTP POST/GET 与本地 Python API 服务器 (localhost:5757) 通信。
     /// 所有调用超时 60 秒，异步。

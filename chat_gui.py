@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-MechForge Chat — 桌面 AI 机械设计助手（聊天窗口）
+SWAI Chat — 桌面 AI 机械设计助手（聊天窗口）
 =================================================
 双击即用：
   1. 自动检测本地 AI 服务（127.0.0.1:5757），未运行则内嵌自动启动
   2. 打开聊天窗口，直接对话设计需求（如"设计离心风机 Q=5000 P=2500 n=1450"）
   3. ⚙ 设置里可填 DeepSeek API Key（可选；不填走降级模式也能识别标准格式）
 
-打包：pyinstaller --onefile --noconsole --name MechForgeChat chat_gui.py
+打包：pyinstaller --onefile --noconsole --name SWAIChat chat_gui.py
 """
 
 import json
@@ -25,7 +25,7 @@ import api  # noqa: F401
 import ai_chat  # noqa: F401
 
 API_BASE = "http://127.0.0.1:5757"
-CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "MechForge")
+CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "SWAI")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 
 # ── 浅色主题（白/淡黄，用户偏好）──
@@ -63,8 +63,8 @@ def start_server_thread():
             import api
             api.app.run(host="127.0.0.1", port=5757, debug=False, use_reloader=False)
         except Exception as e:
-            sys.stderr.write(f"[MechForge] 服务启动失败: {e}\n")
-    t = threading.Thread(target=_run, daemon=True, name="mechforge-server")
+            sys.stderr.write(f"[SWAI] 服务启动失败: {e}\n")
+    t = threading.Thread(target=_run, daemon=True, name="swai-server")
     t.start()
 
 
@@ -90,7 +90,7 @@ def save_config(cfg: dict) -> None:
 class SettingsDialog(tk.Toplevel):
     def __init__(self, master, on_saved=None):
         super().__init__(master)
-        self.title("MechForge 设置")
+        self.title("SWAI 设置")
         self.configure(bg=BG)
         self.resizable(False, False)
         self.on_saved = on_saved
@@ -186,7 +186,7 @@ class SettingsDialog(tk.Toplevel):
 class ChatWindow(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("MechForge AI 机械设计助手")
+        self.title("SW-AI 机械设计助手")
         self.configure(bg=BG)
         self.geometry("880x620")
         self.minsize(640, 480)
@@ -197,7 +197,7 @@ class ChatWindow(tk.Tk):
         self._refresh_status()
 
         # 欢迎语
-        self._append("🤖 我是 MechForge AI 机械设计助手！", "ai")
+        self._append("🤖 我是 SW-AI 机械设计助手！", "ai")
         self._append('直接说需求，比如：\n"设计一台离心风机 Q=5000 P=2500 n=1450"\n"DN100 PN16 平焊法兰"',
                      "ai")
 
@@ -215,7 +215,7 @@ class ChatWindow(tk.Tk):
         top = tk.Frame(self, bg=ACCENT, height=52)
         top.pack(fill="x")
         top.pack_propagate(False)
-        tk.Label(top, text="MechForge 🏭", font=FONT_TITLE, bg=ACCENT, fg="white").pack(side="left", padx=14)
+        tk.Label(top, text="SW-AI 🏭", font=FONT_TITLE, bg=ACCENT, fg="white").pack(side="left", padx=14)
         self.status_lbl = tk.Label(top, text="● 检测中…", font=FONT, bg=ACCENT, fg="white")
         self.status_lbl.pack(side="left", padx=8)
         tk.Button(top, text="⚙ 设置", font=FONT, bg=ACCENT_DARK, fg="white",
@@ -333,7 +333,7 @@ class ChatWindow(tk.Tk):
     def _save_macro(self):
         if not self.last_macro:
             return
-        default = os.path.join(os.path.expanduser("~"), "Desktop", "MechForge_macro.swp")
+        default = os.path.join(os.path.expanduser("~"), "Desktop", "SWAI_macro.swp")
         path = filedialog.asksaveasfilename(
             title="保存 VBA 宏", defaultextension=".swp",
             initialfile=os.path.basename(default), initialdir=os.path.dirname(default),

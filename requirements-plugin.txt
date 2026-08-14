@@ -1,4 +1,4 @@
-# MechForge API Server — 依赖
+# SWAI API Server — 依赖
 
 # ── API 服务器 ──
 flask>=3.0

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MechForge AI 聊天引擎
+SWAI AI 聊天引擎
 =====================
 真正的多轮对话能力：
 - 用户说需求 → LLM 意图识别 + 参数提取（一次调用）
@@ -41,7 +41,7 @@ from axial.params import AxialFanInput
 from axial.design import design_axial_fan as design_axial_engine
 from axial.generator import generate_vba_macro as gen_axial_macro
 
-log = logging.getLogger("mechforge.chat")
+log = logging.getLogger("swai.chat")
 
 # ═══════════════════════════════════════════════════════════════
 # 配置管理
@@ -52,11 +52,11 @@ DEFAULT_MODEL = "deepseek-chat"
 
 
 def _config_path() -> str:
-    """config.json 路径：%APPDATA%/MechForge/config.json（Windows），
+    """config.json 路径：%APPDATA%/SWAI/config.json（Windows），
     回退到脚本同目录 config.json。"""
     appdata = os.environ.get("APPDATA", "")
     if appdata:
-        path = os.path.join(appdata, "MechForge", "config.json")
+        path = os.path.join(appdata, "SWAI", "config.json")
     else:
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
     return path
@@ -89,7 +89,7 @@ def is_llm_configured() -> bool:
 # LLM 客户端
 # ═══════════════════════════════════════════════════════════════
 
-CHAT_SYSTEM_PROMPT = """你是 MechForge 机械设计 AI 助手，集成在 SolidWorks 插件中。你帮机械工程师把需求变成 3D 模型。
+CHAT_SYSTEM_PROMPT = """你是 SW-AI 机械设计 AI 助手，集成在 SolidWorks 插件中。你帮机械工程师把需求变成 3D 模型。
 
 你可以设计以下零件（通过调用设计引擎完成精确计算）：
 1. flange（法兰盘）：必填 dn(公称通径 mm)、pn(公称压力 bar)。可选 flange_type(plate板式平焊/slip_on带颈平焊/weld_neck对焊/blind盲板)、seal_type(rf突面/ff全平面/mfm凹凸面)、material(如 Q235B/304/316L/20#)、n(螺栓孔数量)。
@@ -169,7 +169,7 @@ def _regex_intent(messages: list) -> dict:
     if not any(kw in text for kw in ["设计", "画", "建模", "生成", "做个", "法兰", "风机", "叶轮",
                                      "dn", "pn", "流量", "全压", "转速"]):
         return {"intent": "chat", "type": "", "params": {}, "missing": [],
-                "reply": "我是 MechForge 机械设计助手，可以帮你设计法兰、离心风机叶轮、轴流风机。"
+                "reply": "我是 SWAI 机械设计助手，可以帮你设计法兰、离心风机叶轮、轴流风机。"
                          "例如：\"设计一台离心风机 Q=5000 P=2500 n=1450\" 或 \"DN100 PN16 平焊法兰\"。"}
 
     is_axial = any(kw in text_lower for kw in ["轴流", "axial"])
@@ -342,7 +342,7 @@ def chat(messages: list, use_llm: bool = True) -> dict:
 
     # ── 2. 按意图处理 ──
     if intent_kind == "chat":
-        return {"reply": reply or "我是 MechForge 机械设计助手，告诉我你的设计需求吧。",
+        return {"reply": reply or "我是 SWAI 机械设计助手，告诉我你的设计需求吧。",
                 "action": "chat", "type": "", "params": {}, "summary": "",
                 "macro": "", "name": "", "extra_macro": "", "extra_name": "", "llm": llm_used}
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MechForge API Server — Flask 包装现有设计引擎
+SWAI API Server — Flask 包装现有设计引擎
 
 插件开发调试时可通过浏览器访问 API。
 生产环境：插件通过 localhost:5757 调用。
@@ -59,7 +59,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-log = logging.getLogger("mechforge")
+log = logging.getLogger("swai")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -658,7 +658,7 @@ def get_macro(task_id: str):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="MechForge API Server")
+    parser = argparse.ArgumentParser(description="SWAI API Server")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址 (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=5757, help="监听端口 (default: 5757)")
     parser.add_argument("--debug", action="store_true", help="Debug 模式")
@@ -666,7 +666,7 @@ def main():
 
     print(f"""
 {'='*55}
-  MechForge API Server 🏭
+  SWAI API Server 🏭
   {'='*55}
 
   API Base:  http://{args.host}:{args.port}/api

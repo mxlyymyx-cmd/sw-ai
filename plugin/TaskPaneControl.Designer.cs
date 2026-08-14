@@ -1,4 +1,4 @@
-namespace MechForge
+namespace SWAI
 {
     partial class TaskPaneControl
     {
@@ -142,7 +142,7 @@ namespace MechForge
             this.lblTitle.Location = new System.Drawing.Point(10, 10);
             this.lblTitle.Name = "lblTitle";
             this.lblTitle.Size = new System.Drawing.Size(242, 30);
-            this.lblTitle.Text = "MechForge 🏭";
+            this.lblTitle.Text = "SWAI 🏭";
 
             // 
             // tabControl1

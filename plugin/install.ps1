@@ -1,4 +1,4 @@
-# MechForge SolidWorks 插件安装脚本
+# SWAI SolidWorks 插件安装脚本
 #
 # 用法: 以管理员身份运行 PowerShell
 #   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -11,7 +11,7 @@
 #   - Python API 服务器依赖: pip install flask flask-cors requests
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  MechForge 🏭 插件安装向导" -ForegroundColor Cyan
+Write-Host "  SWAI 🏭 插件安装向导" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -42,7 +42,7 @@ Write-Host ""
 Write-Host "[2/4] 编译 SolidWorks 插件..." -ForegroundColor Yellow
 
 $projectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$csprojPath = Join-Path $projectDir "MechForgeAddin.csproj"
+$csprojPath = Join-Path $projectDir "SWAIAddin.csproj"
 $outputPath = Join-Path $projectDir "bin\x64\Release"
 
 # 检查 MSBuild
@@ -78,7 +78,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-$dllPath = Join-Path $outputPath "MechForgeAddin.dll"
+$dllPath = Join-Path $outputPath "SWAIAddin.dll"
 if (!(Test-Path $dllPath)) {
     Write-Host "  ❌ 编译产物未找到: $dllPath" -ForegroundColor Red
     exit 1
@@ -128,20 +128,20 @@ if (Test-Path $regKey) {
     Write-Host "  ✅ 注册表项存在: $regKey" -ForegroundColor Green
 } else {
     Write-Host "  ⚠️  注册表项不存在，请在 SolidWorks 中手动加载插件" -ForegroundColor Yellow
-    Write-Host "     SolidWorks → 工具 → 插件 → 勾选 MechForge" -ForegroundColor Gray
+    Write-Host "     SolidWorks → 工具 → 插件 → 勾选 SWAI" -ForegroundColor Gray
 }
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  ✅ MechForge 安装完成!" -ForegroundColor Green
+Write-Host "  ✅ SWAI 安装完成!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "下一步:" -ForegroundColor White
 Write-Host "  1. 启动 Python API 服务器:" -ForegroundColor Gray
 Write-Host "     python api.py --port 5757" -ForegroundColor Gray
 Write-Host "  2. 启动/重启 SolidWorks" -ForegroundColor Gray
-Write-Host "  3. 工具 → 插件 → 勾选 MechForge Addin" -ForegroundColor Gray
-Write-Host "  4. 点击 MechForge 工具栏按钮打开面板" -ForegroundColor Gray
+Write-Host "  3. 工具 → 插件 → 勾选 SWAI Addin" -ForegroundColor Gray
+Write-Host "  4. 点击 SWAI 工具栏按钮打开面板" -ForegroundColor Gray
 Write-Host ""
 Write-Host "或手动注册 (以管理员身份):" -ForegroundColor Gray
-Write-Host "  regasm /codebase bin\x64\Release\MechForgeAddin.dll" -ForegroundColor Gray
+Write-Host "  regasm /codebase bin\x64\Release\SWAIAddin.dll" -ForegroundColor Gray

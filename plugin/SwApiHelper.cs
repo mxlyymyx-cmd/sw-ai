@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
-namespace MechForge
+namespace SWAI
 {
     /// <summary>
     /// SolidWorks COM API 辅助类。
@@ -201,7 +201,7 @@ namespace MechForge
                 string tempPath = macroPath;
                 if (string.IsNullOrEmpty(tempPath))
                 {
-                    tempPath = Path.Combine(Path.GetTempPath(), "MechForge_TempMacro.bas");
+                    tempPath = Path.Combine(Path.GetTempPath(), "SWAI_TempMacro.bas");
                 }
 
                 // 强制声明模块名为 Module1（VBA 从 .bas 导入时模块名默认取文件名，

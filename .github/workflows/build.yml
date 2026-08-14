@@ -1,6 +1,6 @@
-# MechForge — GitHub Actions 自动打包
-# 每次 push 到 main 分支，自动编译 MechForge.exe
-name: Build MechForge
+# SWAI — GitHub Actions 自动打包
+# 每次 push 到 main 分支，自动编译 SWAI.exe
+name: Build SWAI
 
 on:
   push:
@@ -25,21 +25,21 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: 🔨 打包 MechForge.exe
+      - name: 🔨 打包 SWAI.exe
         run: |
           pyinstaller --noconfirm build/mech_forge.spec
 
       - name: 📦 压缩为 ZIP
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path MechForge-v1.0
-          Copy-Item dist\MechForge.exe -Destination MechForge-v1.0\
-          Copy-Item README.md -Destination MechForge-v1.0\
-          Compress-Archive -Path MechForge-v1.0\* -DestinationPath MechForge-win64.zip -Force
+          New-Item -ItemType Directory -Force -Path SWAI-v1.0
+          Copy-Item dist\SWAI.exe -Destination SWAI-v1.0\
+          Copy-Item README.md -Destination SWAI-v1.0\
+          Compress-Archive -Path SWAI-v1.0\* -DestinationPath SWAI-win64.zip -Force
 
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: MechForge-win64
-          path: MechForge-win64.zip
+          name: SWAI-win64
+          path: SWAI-win64.zip
           if-no-files-found: error

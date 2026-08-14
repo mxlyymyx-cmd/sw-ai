@@ -1,10 +1,10 @@
-# MechForge 🏭
+# SW-AI 🏭
 
 > SolidWorks 参数化设计引擎 — 机械行业 AI 自动化基座
 >
 > 「你说规格，AI 画图」
 
-MechForge 是一个面向机械设计的 AI 参数化建模工具集，支持从自然语言规格到 SolidWorks 3D 模型的完整自动化流程。目前涵盖法兰、离心风机叶轮、轴流风机三个模块，每个模块都包含独立的设计计算引擎和 SolidWorks COM API 建模能力。
+SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自然语言规格到 SolidWorks 3D 模型的完整自动化流程。目前涵盖法兰、离心风机叶轮、轴流风机三个模块，每个模块都包含独立的设计计算引擎和 SolidWorks COM API 建模能力。
 
 ---
 
@@ -100,10 +100,10 @@ C# SolidWorks Add-in，与 API 服务通信：
 
 ## 安装
 
-1. 下载 `MechForge-Setup-1.0.0.exe` 双击安装（自动注册插件 + 安装 AI 服务）
-2. 安装完自动打开 **MechForge 聊天窗口**（或双击桌面"MechForge"图标）
+1. 下载 `SWAI-Setup-1.0.0.exe` 双击安装（自动注册插件 + 安装 AI 服务）
+2. 安装完自动打开 **SWAI 聊天窗口**（或双击桌面"SWAI"图标）
 3. 在聊天窗口点 **⚙ 设置** 填入 DeepSeek API Key（可选，不填也能用降级模式）
-4. 在 SolidWorks 中：**工具 → 插件 → 勾选 MechForge Addin**，右侧任务面板同样可以对话
+4. 在 SolidWorks 中：**工具 → 插件 → 勾选 SWAI Addin**，右侧任务面板同样可以对话
 
 > 聊天窗口会自动启动后台 AI 服务（无黑窗口），SolidWorks 插件与聊天窗口共用同一个服务。
 

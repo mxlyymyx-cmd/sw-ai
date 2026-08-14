@@ -4,13 +4,13 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <LangVersion>8.0</LangVersion>
     <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
-    <AssemblyName>MechForgeAddin</AssemblyName>
-    <RootNamespace>MechForge</RootNamespace>
+    <AssemblyName>SWAIAddin</AssemblyName>
+    <RootNamespace>SWAI</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
-    <!-- 生产环境建议签名: 使用 sn.exe 生成 MechForge.snk 并取消注释下方两行 -->
+    <!-- 生产环境建议签名: 使用 sn.exe 生成 SWAI.snk 并取消注释下方两行 -->
     <!-- <SignAssembly>true</SignAssembly> -->
-    <!-- <AssemblyOriginatorKeyFile>MechForge.snk</AssemblyOriginatorKeyFile> -->
+    <!-- <AssemblyOriginatorKeyFile>SWAI.snk</AssemblyOriginatorKeyFile> -->
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
@@ -96,7 +96,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="MechForgeAddin.cs" />
+    <Compile Include="SWAIAddin.cs" />
     <Compile Include="TaskPaneControl.cs" />
     <Compile Include="TaskPaneControl.Designer.cs" />
     <Compile Include="ApiClient.cs" />

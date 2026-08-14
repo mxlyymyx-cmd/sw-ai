@@ -6,10 +6,10 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace MechForge
+namespace SWAI
 {
     /// <summary>
-    /// MechForge 任务面板控件。
+    /// SWAI 任务面板控件。
     /// 
     /// 包含：
     /// - 顶部 Logo + 标题
@@ -19,7 +19,7 @@ namespace MechForge
     /// - 底部状态栏
     /// </summary>
     [ComVisible(true)]
-    [ProgId("MechForge.TaskPaneControl")]
+    [ProgId("SWAI.TaskPaneControl")]
     [Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567892")]
     public partial class TaskPaneControl : UserControl
     {
@@ -34,7 +34,7 @@ namespace MechForge
         #region 构造函数
 
         /// <summary>
-        /// 初始化 MechForge 任务面板。
+        /// 初始化 SWAI 任务面板。
         /// </summary>
         public TaskPaneControl()
         {
@@ -48,7 +48,7 @@ namespace MechForge
             _ = CheckBackendHealthAsync();
 
             // 欢迎消息
-            AppendChat("🤖 我是 MechForge AI，直接告诉我你的设计需求，比如：\n" +
+            AppendChat("🤖 我是 SWAI AI，直接告诉我你的设计需求，比如：\n" +
                        "\"设计一台离心风机 Q=5000 P=2500 n=1450\"\n" +
                        "\"DN100 PN16 平焊法兰\"", Color.FromArgb(144, 238, 144));
         }
@@ -198,7 +198,7 @@ namespace MechForge
         }
 
         /// <summary>
-        /// 保存设置到 %APPDATA%\MechForge\config.json。
+        /// 保存设置到 %APPDATA%\SWAI\config.json。
         /// </summary>
         private static void SaveSettings(string apiKey, string apiUrl, string model)
         {
@@ -206,7 +206,7 @@ namespace MechForge
             {
                 string dir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "MechForge");
+                    "SWAI");
                 Directory.CreateDirectory(dir);
 
                 string path = Path.Combine(dir, "config.json");
@@ -221,7 +221,7 @@ namespace MechForge
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存设置失败: {ex.Message}", "MechForge",
+                MessageBox.Show($"保存设置失败: {ex.Message}", "SWAI",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }

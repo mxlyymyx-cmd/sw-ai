@@ -1,4 +1,4 @@
-# MechForge 🏭 C# 插件一键编译打包脚本
+# SWAI 🏭 C# 插件一键编译打包脚本
 #
 # 用法：
 #   以管理员身份运行 PowerShell，然后：
@@ -23,10 +23,10 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $PluginDir = Join-Path $ProjectRoot "plugin"
 $LibsDir = Join-Path $PluginDir "libs"
-$OutputZip = Join-Path $ProjectRoot "MechForge-Plugin-win64.zip"
+$OutputZip = Join-Path $ProjectRoot "SWAI-Plugin-win64.zip"
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  MechForge 🏭  C# 插件编译打包" -ForegroundColor Cyan
+Write-Host "  SWAI 🏭  C# 插件编译打包" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -99,7 +99,7 @@ Write-Host "  ✅ MSBuild: $msbuild" -ForegroundColor Green
 Write-Host ""
 Write-Host "[3/5] 编译 C# 插件..." -ForegroundColor Yellow
 
-$csproj = Join-Path $PluginDir "MechForgeAddin.csproj"
+$csproj = Join-Path $PluginDir "SWAIAddin.csproj"
 & $msbuild $csproj /p:Configuration=Release /p:Platform=x64 /t:Clean,Build /nologo /verbosity:minimal
 
 if ($LASTEXITCODE -ne 0) {
@@ -107,7 +107,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-$dllPath = Join-Path $PluginDir "bin\x64\Release\MechForgeAddin.dll"
+$dllPath = Join-Path $PluginDir "bin\x64\Release\SWAIAddin.dll"
 if (!(Test-Path $dllPath)) {
     Write-Host "  ❌ 未找到编译产物" -ForegroundColor Red
     exit 1
@@ -119,7 +119,7 @@ Write-Host "  ✅ 编译成功: $dllPath" -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/5] 打包为 ZIP..." -ForegroundColor Yellow
 
-$zipDir = Join-Path $ProjectRoot "MechForge-Plugin-v1.0"
+$zipDir = Join-Path $ProjectRoot "SWAI-Plugin-v1.0"
 New-Item -ItemType Directory -Force -Path $zipDir | Out-Null
 
 Copy-Item $dllPath -Destination $zipDir
@@ -149,7 +149,7 @@ if (!$SkipGitPush) {
         git -C $ProjectRoot push origin main
         
         Write-Host "  ✅ 已推送到 GitHub，CI 下次会自动编译" -ForegroundColor Green
-        Write-Host "     去查看: https://github.com/mxlyymyx-cmd/mech-forge/actions" -ForegroundColor Gray
+        Write-Host "     去查看: https://github.com/mxlyymyx-cmd/sw-ai/actions" -ForegroundColor Gray
     } catch {
         Write-Host "  ⚠️  提交失败: $_" -ForegroundColor Yellow
         Write-Host "     下次推代码时会自动触发 CI 编译" -ForegroundColor Gray
@@ -176,4 +176,4 @@ Write-Host ""
 Write-Host "现在去 SolidWorks 试试：" -ForegroundColor White
 Write-Host "  1. 确保 Python API 在跑：python api.py --port 5757" -ForegroundColor Gray
 Write-Host "  2. 启动 SolidWorks" -ForegroundColor Gray
-Write-Host "  3. 工具 → 插件 → 勾选 MechForge Addin" -ForegroundColor Gray
+Write-Host "  3. 工具 → 插件 → 勾选 SWAI Addin" -ForegroundColor Gray

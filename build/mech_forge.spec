@@ -1,14 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-MechForge — PyInstaller 打包配置
+SWAI — PyInstaller 打包配置
 
-MechForge 是 CLI 工具（非 GUI），默认带命令行窗口。
+SWAI 是 CLI 工具（非 GUI），默认带命令行窗口。
 
 使用说明：
   1. 在 Windows 上装好 Python 3.12+
   2. pip install -r requirements.txt
   3. pyinstaller --noconfirm build/mech_forge.spec
-  4. 成品在 dist/MechForge.exe
+  4. 成品在 dist/SWAI.exe
 """
 import sys
 import os
@@ -77,7 +77,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="MechForge",
+    name="SWAI",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

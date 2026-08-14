@@ -4,19 +4,19 @@ using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using SolidWorks.Interop.swpublished;
 
-namespace MechForge
+namespace SWAI
 {
     /// <summary>
-    /// MechForge SolidWorks 插件主入口
+    /// SWAI SolidWorks 插件主入口
     /// 
     /// 注册方式（管理员终端）：
-    ///   regasm /codebase MechForgeAddin.dll
+    ///   regasm /codebase SWAIAddin.dll
     ///   或在安装时由安装程序自动注册。
     /// </summary>
     [Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567891")]
     [ComVisible(true)]
-    [ProgId("MechForge.Addin")]
-    public class MechForgeAddin : ISwAddin
+    [ProgId("SWAI.Addin")]
+    public class SWAIAddin : ISwAddin
     {
         #region 私有字段
 
@@ -54,7 +54,7 @@ namespace MechForge
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[MechForge] Connect failed: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[SWAI] Connect failed: " + ex.Message);
                 return false;
             }
         }
@@ -78,7 +78,7 @@ namespace MechForge
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[MechForge] Disconnect failed: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[SWAI] Disconnect failed: " + ex.Message);
                 return false;
             }
         }
@@ -98,25 +98,25 @@ namespace MechForge
                 _taskPane = new TaskPaneControl();
 
                 // 现代 API：创建任务窗格视图（空位图 + 提示）
-                _taskPaneView = _swApp.CreateTaskpaneView2("", "MechForge 🏭");
+                _taskPaneView = _swApp.CreateTaskpaneView2("", "SWAI 🏭");
                 if (_taskPaneView == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[MechForge] CreateTaskpaneView2 returned null");
+                    System.Diagnostics.Debug.WriteLine("[SWAI] CreateTaskpaneView2 returned null");
                     return;
                 }
 
                 // 将 UserControl 挂到任务窗格（需 TaskPaneControl 为 COM 可见）
                 object control = _taskPaneView.AddControl(
-                    "MechForge.TaskPaneControl",
+                    "SWAI.TaskPaneControl",
                     "");
                 if (control == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[MechForge] AddControl returned null");
+                    System.Diagnostics.Debug.WriteLine("[SWAI] AddControl returned null");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[MechForge] CreateTaskPane failed: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[SWAI] CreateTaskPane failed: " + ex.Message);
             }
         }
 
@@ -135,7 +135,7 @@ namespace MechForge
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[MechForge] RemoveTaskPane failed: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("[SWAI] RemoveTaskPane failed: " + ex.Message);
             }
         }
 

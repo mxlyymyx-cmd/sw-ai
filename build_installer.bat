@@ -1,10 +1,10 @@
 @echo off
 REM ─────────────────────────────────────────────────────────────
-REM  MechForge 🏭 SolidWorks AI 插件 — 一键打包安装包
+REM  SWAI 🏭 SolidWorks AI 插件 — 一键打包安装包
 REM  在 Windows 上双击运行，自动完成：
 REM    1. 编译 C# 插件 DLL
 REM    2. PyInstaller 打包 Python API 服务为独立 exe
-REM    3. Inno Setup 生成 MechForge-Setup-1.0.0.exe
+REM    3. Inno Setup 生成 SWAI-Setup-1.0.0.exe
 REM  前提：已安装 Python 3.10+、VS Build Tools（或 VS 2022）、Inno Setup 6
 REM ─────────────────────────────────────────────────────────────
 chcp 65001 >nul
@@ -12,7 +12,7 @@ setlocal enabledelayedexpansion
 cd /d %~dp0..
 
 echo ============================================
-echo   MechForge 一键打包安装包
+echo   SWAI 一键打包安装包
 echo ============================================
 echo.
 
@@ -32,13 +32,13 @@ echo [1/4] MSBuild: %MSBUILD%
 
 REM ── 2. 编译 C# 插件 ──
 echo [2/4] 编译 SolidWorks 插件...
-"%MSBUILD%" plugin\MechForgeAddin.csproj /p:Configuration=Release /p:Platform=x64 /t:Clean,Build /nologo /verbosity:minimal
+"%MSBUILD%" plugin\SWAIAddin.csproj /p:Configuration=Release /p:Platform=x64 /t:Clean,Build /nologo /verbosity:minimal
 if errorlevel 1 (
     echo [❌] 插件编译失败
     pause & exit /b 1
 )
-if not exist "plugin\bin\x64\Release\MechForgeAddin.dll" (
-    echo [❌] 未找到编译产物 plugin\bin\x64\Release\MechForgeAddin.dll
+if not exist "plugin\bin\x64\Release\SWAIAddin.dll" (
+    echo [❌] 未找到编译产物 plugin\bin\x64\Release\SWAIAddin.dll
     echo     请确认 plugin\libs\ 下有 SolidWorks Interop DLL
     pause & exit /b 1
 )
@@ -49,14 +49,14 @@ echo [3/4] 打包 Python API 服务...
 pip install -r requirements-plugin.txt -q 2>nul
 pip install pyinstaller -q 2>nul
 if not exist dist mkdir dist
-pyinstaller --onefile --name MechForgeServer --clean --noconfirm ^
+pyinstaller --onefile --name SWAIServer --clean --noconfirm ^
     --hidden-import flask --hidden-import flask_cors --hidden-import requests ^
     api.py
 if errorlevel 1 (
     echo [❌] PyInstaller 打包失败
     pause & exit /b 1
 )
-echo [✅] MechForgeServer.exe 就绪
+echo [✅] SWAIServer.exe 就绪
 
 REM ── 4. Inno Setup 生成安装包 ──
 echo [4/4] 构建安装程序...
@@ -78,12 +78,12 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   ✅ 全部完成！
-echo   安装包: dist\MechForge-Setup-1.0.0.exe
+echo   安装包: dist\SWAI-Setup-1.0.0.exe
 echo ============================================
 echo.
 echo 把这个 exe 发给同事，双击就能装：
 echo   1. 双击安装包 → 下一步下一步
-echo   2. 打开 SolidWorks → 工具 → 插件 → 勾选 MechForge Addin
+echo   2. 打开 SolidWorks → 工具 → 插件 → 勾选 SWAI Addin
 echo   3. AI 服务已开机自启，直接对话建模
 echo.
 pause

@@ -2,11 +2,11 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace MechForge
+namespace SWAI
 {
     /// <summary>
     /// LLM 设置对话框 — 配置 API Key / URL / 模型。
-    /// 保存位置: %APPDATA%\MechForge\config.json（后端自动读取）
+    /// 保存位置: %APPDATA%\SWAI\config.json（后端自动读取）
     /// </summary>
     public class SettingsDialog : Form
     {
@@ -32,7 +32,7 @@ namespace MechForge
 
         private void InitializeComponent()
         {
-            this.Text = "⚙ MechForge AI 设置";
+            this.Text = "⚙ SWAI AI 设置";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;

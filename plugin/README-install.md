@@ -1,6 +1,6 @@
-# MechForge 🏭 SolidWorks AI 插件安装说明
+# SWAI 🏭 SolidWorks AI 插件安装说明
 
-MechForge 是一个带 **AI 对话能力**的 SolidWorks 参数化设计插件：
+SWAI 是一个带 **AI 对话能力**的 SolidWorks 参数化设计插件：
 - 💬 **AI 对话 Tab**：打开 SolidWorks 任务面板，直接和 AI 对话
   - "设计一台离心风机 Q=5000 P=2500 n=1450"
   - "DN100 PN16 平焊法兰"
@@ -45,7 +45,7 @@ python api.py --port 5757
 
 终端应显示：
 ```
-MechForge API Server 🏭
+SWAI API Server 🏭
 =======================================================
 API Base:  http://127.0.0.1:5757/api
 ```
@@ -53,12 +53,12 @@ API Base:  http://127.0.0.1:5757/api
 ### Step 2: 配置 AI 对话（可选，推荐）
 
 **方式一：插件内配置（推荐）**
-1. SolidWorks 里打开 MechForge 面板 → 「AI 对话」Tab → 点「⚙ 设置」
+1. SolidWorks 里打开 SWAI 面板 → 「AI 对话」Tab → 点「⚙ 设置」
 2. 填入 DeepSeek API Key（[platform.deepseek.com](https://platform.deepseek.com) 获取）
 3. 保存即可，无需重启
 
 **方式二：手动配置文件**
-创建 `%APPDATA%\MechForge\config.json`：
+创建 `%APPDATA%\SWAI\config.json`：
 ```json
 {"llm_api_key": "sk-你的key", "llm_api_url": "https://api.deepseek.com/v1/chat/completions", "llm_model": "deepseek-chat"}
 ```
@@ -94,20 +94,20 @@ cd projects\solidworks-parametric\plugin
 
 ```cmd
 cd projects\solidworks-parametric\plugin
-msbuild MechForgeAddin.csproj /p:Configuration=Release /p:Platform=x64
-regasm /codebase bin\x64\Release\MechForgeAddin.dll
+msbuild SWAIAddin.csproj /p:Configuration=Release /p:Platform=x64
+regasm /codebase bin\x64\Release\SWAIAddin.dll
 ```
 
 ### Step 4: 在 SolidWorks 中加载插件
 
 1. 启动/重启 SolidWorks
 2. 菜单栏 → **工具** → **插件**
-3. 弹出窗口中勾选 **MechForge Addin**
-4. SolidWorks 工具栏出现 **MechForge** 菜单
+3. 弹出窗口中勾选 **SWAI Addin**
+4. SolidWorks 工具栏出现 **SWAI** 菜单
 
 ### Step 5: 使用 — 和 AI 对话
 
-1. 点击菜单栏 **MechForge** → **打开 MechForge 面板**
+1. 点击菜单栏 **SWAI** → **打开 SWAI 面板**
 2. 默认打开「AI 对话 💬」Tab
 3. 直接输入需求，例如：
    - `设计一台离心风机 Q=5000 P=2500 n=1450` → 自动建模叶轮 + 蜗壳
@@ -123,7 +123,7 @@ regasm /codebase bin\x64\Release\MechForgeAddin.dll
 以管理员身份运行：
 
 ```cmd
-regasm /unregister bin\x64\Release\MechForgeAddin.dll
+regasm /unregister bin\x64\Release\SWAIAddin.dll
 ```
 
 ### 清理 SolidWorks 注册项
@@ -176,7 +176,7 @@ curl http://127.0.0.1:5757/api/health
 C:\Program Files\SolidWorks Corp\SolidWorks\api\redist\
 ```
 
-如果路径不同，编辑 `MechForgeAddin.csproj` 中的 HintPath。
+如果路径不同，编辑 `SWAIAddin.csproj` 中的 HintPath。
 
 ### Q: 任务面板内容滚动/显示不全
 
@@ -188,7 +188,7 @@ C:\Program Files\SolidWorks Corp\SolidWorks\api\redist\
 
 ```csharp
 // 在代码中:
-System.Diagnostics.Debug.WriteLine("[MechForge] 调试信息");
+System.Diagnostics.Debug.WriteLine("[SWAI] 调试信息");
 // 用 DebugView (Sysinternals) 查看
 ```
 
@@ -202,8 +202,8 @@ python api.py --port 5757 --debug
 
 ```
 plugin/
-├── MechForgeAddin.csproj          # C# 项目文件 (.NET 4.8)
-├── MechForgeAddin.cs              # 插件主入口 (ISwAddin)
+├── SWAIAddin.csproj          # C# 项目文件 (.NET 4.8)
+├── SWAIAddin.cs              # 插件主入口 (ISwAddin)
 ├── TaskPaneControl.cs             # 任务面板逻辑（AI 对话 + 手动模式）
 ├── TaskPaneControl.Designer.cs    # 任务面板布局
 ├── SettingsDialog.cs              # AI 设置对话框（API Key 配置）
@@ -216,5 +216,5 @@ plugin/
 ├── api.py                         # Flask API 服务器 (localhost:5757)
 ├── ai_chat.py                     # AI 对话引擎（意图识别 + 设计 + 宏生成）
 ├── flange/  impeller/  axial/     # 设计引擎
-└── config.json                    # LLM 配置（可选，或放 %APPDATA%\MechForge\）
+└── config.json                    # LLM 配置（可选，或放 %APPDATA%\SWAI\）
 ```

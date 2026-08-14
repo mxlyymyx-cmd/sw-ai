@@ -91,7 +91,7 @@ jobs:
         run: |
           if (Test-Path "plugin/libs/SolidWorks.Interop.sldworks.dll") {
             Write-Host "✅ SolidWorks Interop DLL 已就绪，开始编译..."
-            msbuild plugin/MechForgeAddin.csproj /p:Configuration=Release /p:Platform=x64
+            msbuild plugin/SWAIAddin.csproj /p:Configuration=Release /p:Platform=x64
             if ($LASTEXITCODE -eq 0) {
               Write-Host "✅ 编译成功"
             } else {
@@ -114,29 +114,29 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           # --onefile 单文件模式 + --noconsole 隐藏控制台窗口（服务静默后台运行）
-          pyinstaller --onefile --noconsole --name MechForgeServer --clean --noconfirm `
+          pyinstaller --onefile --noconsole --name SWAIServer --clean --noconfirm `
             --hidden-import flask --hidden-import flask_cors --hidden-import requests `
             api.py
-          if (!(Test-Path "dist\MechForgeServer.exe")) {
-            Write-Host "❌ PyInstaller 打包 MechForgeServer 失败"
+          if (!(Test-Path "dist\SWAIServer.exe")) {
+            Write-Host "❌ PyInstaller 打包 SWAIServer 失败"
             exit 1
           }
-          Write-Host "✅ MechForgeServer.exe 就绪: $((Get-Item 'dist\MechForgeServer.exe').Length / 1MB) MB"
+          Write-Host "✅ SWAIServer.exe 就绪: $((Get-Item 'dist\SWAIServer.exe').Length / 1MB) MB"
 
-      - name: 💬 打包聊天窗口桌面应用（MechForgeChat.exe）
+      - name: 💬 打包聊天窗口桌面应用（SWAIChat.exe）
         shell: pwsh
         run: |
           # 聊天 GUI：双击打开就是正常对话界面，自动拉起本地服务
-          pyinstaller --onefile --noconsole --name MechForgeChat --clean --noconfirm `
+          pyinstaller --onefile --noconsole --name SWAIChat --clean --noconfirm `
             --hidden-import flask --hidden-import flask_cors --hidden-import requests `
             --hidden-import api --hidden-import ai_chat `
             --collect-submodules flange --collect-submodules impeller --collect-submodules axial `
             chat_gui.py
-          if (!(Test-Path "dist\MechForgeChat.exe")) {
-            Write-Host "❌ PyInstaller 打包 MechForgeChat 失败"
+          if (!(Test-Path "dist\SWAIChat.exe")) {
+            Write-Host "❌ PyInstaller 打包 SWAIChat 失败"
             exit 1
           }
-          Write-Host "✅ MechForgeChat.exe 就绪: $((Get-Item 'dist\MechForgeChat.exe').Length / 1MB) MB"
+          Write-Host "✅ SWAIChat.exe 就绪: $((Get-Item 'dist\SWAIChat.exe').Length / 1MB) MB"
 
       - name: 📦 安装 Inno Setup
         shell: pwsh
@@ -165,16 +165,16 @@ jobs:
       - name: 📤 上传安装包
         uses: actions/upload-artifact@v4
         with:
-          name: MechForge-Setup
-          path: dist\MechForge-Setup-*.exe
+          name: SWAI-Setup
+          path: dist\SWAI-Setup-*.exe
           if-no-files-found: error
 
       - name: 📤 上传插件 ZIP（保留原分发方式）
         uses: actions/upload-artifact@v4
         with:
-          name: MechForge-Plugin-win64
+          name: SWAI-Plugin-win64
           path: |
-            plugin\bin\x64\Release\MechForgeAddin.dll
+            plugin\bin\x64\Release\SWAIAddin.dll
             plugin\install.ps1
             plugin\README-install.md
           if-no-files-found: warn
