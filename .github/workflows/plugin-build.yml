@@ -91,7 +91,7 @@ jobs:
         run: |
           if (Test-Path "plugin/libs/SolidWorks.Interop.sldworks.dll") {
             Write-Host "✅ SolidWorks Interop DLL 已就绪，开始编译..."
-            msbuild plugin/SWAIAddin.csproj /p:Configuration=Release /p:Platform=x64
+            msbuild plugin/SWAIAddin.csproj /p:Configuration=Release /p:Platform=x86
             if ($LASTEXITCODE -eq 0) {
               Write-Host "✅ 编译成功"
             } else {
@@ -172,9 +172,9 @@ jobs:
       - name: 📤 上传插件 ZIP（保留原分发方式）
         uses: actions/upload-artifact@v4
         with:
-          name: SWAI-Plugin-win64
+          name: SWAI-Plugin-win32
           path: |
-            plugin\bin\x64\Release\SWAIAddin.dll
+            plugin\bin\x86\Release\SWAIAddin.dll
             plugin\install.ps1
             plugin\README-install.md
           if-no-files-found: warn
