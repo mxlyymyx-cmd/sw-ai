@@ -43,7 +43,7 @@ Write-Host "[2/4] 编译 SolidWorks 插件..." -ForegroundColor Yellow
 
 $projectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $csprojPath = Join-Path $projectDir "SWAIAddin.csproj"
-$outputPath = Join-Path $projectDir "bin\x64\Release"
+$outputPath = Join-Path $projectDir "bin\x86\Release"
 
 # 检查 MSBuild
 $msbuildPaths = @(
@@ -71,7 +71,7 @@ if ($msbuild -eq $null -or !(Test-Path $msbuild)) {
 Write-Host "  使用 MSBuild: $msbuild" -ForegroundColor Gray
 
 # 编译
-& $msbuild $csprojPath /p:Configuration=Release /p:Platform=x64 /t:Clean,Build
+& $msbuild $csprojPath /p:Configuration=Release /p:Platform=x86 /t:Clean,Build
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ❌ 编译失败，请检查错误信息" -ForegroundColor Red
@@ -90,10 +90,10 @@ Write-Host "  ✅ 编译成功: $dllPath" -ForegroundColor Green
 Write-Host ""
 Write-Host "[3/4] 注册 COM (regasm)..." -ForegroundColor Yellow
 
-# 检查 regasm
+# 检查 regasm（x86 DLL 必须用 32 位 RegAsm —— SolidWorks 是 32 位进程）
 $regasmPaths = @(
-    "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe",
-    "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe"
+    "C:\Windows\Microsoft.NET\Framework\v4.0.30319\RegAsm.exe",
+    "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe"
 )
 
 $regasm = $null
@@ -123,12 +123,17 @@ Write-Host "  ✅ COM 注册成功" -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/4] 验证安装..." -ForegroundColor Yellow
 
-$regKey = "HKLM:\SOFTWARE\SolidWorks\AddIns\{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}"
+$regKey = "HKLM:\SOFTWARE\WOW6432Node\SolidWorks\AddIns\{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}"
 if (Test-Path $regKey) {
     Write-Host "  ✅ 注册表项存在: $regKey" -ForegroundColor Green
 } else {
-    Write-Host "  ⚠️  注册表项不存在，请在 SolidWorks 中手动加载插件" -ForegroundColor Yellow
-    Write-Host "     SolidWorks → 工具 → 插件 → 勾选 SWAI" -ForegroundColor Gray
+    $regKey = "HKLM:\SOFTWARE\SolidWorks\AddIns\{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}"
+    if (Test-Path $regKey) {
+        Write-Host "  ✅ 注册表项存在(64位视图): $regKey" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠️  注册表项不存在，请在 SolidWorks 中手动加载插件" -ForegroundColor Yellow
+        Write-Host "     SolidWorks → 工具 → 插件 → 勾选 SWAI" -ForegroundColor Gray
+    }
 }
 
 Write-Host ""
@@ -144,4 +149,4 @@ Write-Host "  3. 工具 → 插件 → 勾选 SWAI Addin" -ForegroundColor Gray
 Write-Host "  4. 点击 SWAI 工具栏按钮打开面板" -ForegroundColor Gray
 Write-Host ""
 Write-Host "或手动注册 (以管理员身份):" -ForegroundColor Gray
-Write-Host "  regasm /codebase bin\x64\Release\SWAIAddin.dll" -ForegroundColor Gray
+Write-Host "  regasm /codebase bin\x86\Release\SWAIAddin.dll" -ForegroundColor Gray
