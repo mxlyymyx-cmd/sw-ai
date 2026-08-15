@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $PluginDir = Join-Path $ProjectRoot "plugin"
 $LibsDir = Join-Path $PluginDir "libs"
-$OutputZip = Join-Path $ProjectRoot "SWAI-Plugin-win64.zip"
+$OutputZip = Join-Path $ProjectRoot "SWAI-Plugin-win32.zip"
 
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  SWAI 🏭  C# 插件编译打包" -ForegroundColor Cyan
@@ -100,14 +100,14 @@ Write-Host ""
 Write-Host "[3/5] 编译 C# 插件..." -ForegroundColor Yellow
 
 $csproj = Join-Path $PluginDir "SWAIAddin.csproj"
-& $msbuild $csproj /p:Configuration=Release /p:Platform=x64 /t:Clean,Build /nologo /verbosity:minimal
+& $msbuild $csproj /p:Configuration=Release /p:Platform=x86 /t:Clean,Build /nologo /verbosity:minimal
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ❌ 编译失败，错误码: $LASTEXITCODE" -ForegroundColor Red
     exit 1
 }
 
-$dllPath = Join-Path $PluginDir "bin\x64\Release\SWAIAddin.dll"
+$dllPath = Join-Path $PluginDir "bin\x86\Release\SWAIAddin.dll"
 if (!(Test-Path $dllPath)) {
     Write-Host "  ❌ 未找到编译产物" -ForegroundColor Red
     exit 1
