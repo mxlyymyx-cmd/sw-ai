@@ -162,6 +162,19 @@ jobs:
         run: |
           Get-ChildItem dist\* -Recurse | ForEach-Object { Write-Host "  📦 $($_.FullName) ($($_.Length / 1KB) KB)" }
 
+      - name: 🚀 发布 Release（公开下载，匿名可拿）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.2
+          name: SW-AI v1.0.2
+          body: |
+            🔧 根治插件不显示：
+            - 移除 RegAsm 依赖（普通电脑没有 .NET SDK，RegAsm.exe 不存在导致 COM 注册静默失败）
+            - 安装包直接手写注册表（32位+64位视图全写）
+            - 插件 DLL 改 AnyCPU（32/64 位 SolidWorks 通吃）
+          files: dist\SWAI-Setup-*.exe
+          fail_on_unmatched_files: true
+
       - name: 📤 上传安装包
         uses: actions/upload-artifact@v4
         with:
