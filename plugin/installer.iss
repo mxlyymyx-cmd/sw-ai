@@ -6,7 +6,7 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SW-AI"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "SWAI"
 #define MyAppURL "https://github.com/mxlyymyx-cmd/sw-ai"
 #define MyAppExeName "SWAIAddin.dll"
@@ -47,8 +47,8 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 Name: "autostart"; Description: "开机自动启动 SWAI AI 服务"; GroupDescription: "服务:"
 
 [Files]
-; 预编译的插件 DLL（由 GitHub Actions 编译，x86 —— SolidWorks 主程序是 32 位）
-Source: "bin\x86\Release\SWAIAddin.dll"; DestDir: "{app}"; Flags: ignoreversion
+; 预编译的插件 DLL（AnyCPU：32 位/64 位 SolidWorks 都能加载）
+Source: "bin\AnyCPU\Release\SWAIAddin.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; PyInstaller 打包的 Python API 服务（用户无需安装 Python，静默后台运行）
 Source: "..\dist\SWAIServer.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; 聊天窗口桌面应用（双击即聊，自动拉起服务）
@@ -69,14 +69,32 @@ Root: HKCU32; Subkey: "Software\SolidWorks\AddinsStartup\{{A1B2C3D4-E5F6-7890-AB
 Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
 Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
 
+; ── COM 注册（RegAsm 等价物，Inno 手写注册表）──
+; 为什么不用 RegAsm：RegAsm.exe 属于 .NET Framework SDK/Developer Pack，
+; 普通电脑只有 Runtime 没有 SDK，RegAsm.exe 不存在 → COM 注册悄悄失败 → 插件列表不显示。
+; 这里手写 RegAsm /codebase 的全部关键键值，32 位 + 64 位视图都写，
+; 32 位/64 位 SolidWorks 都能找到。
+; ── 32 位 COM 视图 ──
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "SW-AI"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "mscoree.dll"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Both"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Assembly"; ValueData: "SWAIAddin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Class"; ValueData: "SWAI.SWAIAddin"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "CodeBase"; ValueData: "file:///{app}/SWAIAddin.dll"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\ProgId"; ValueType: string; ValueName: ""; ValueData: "SWAI.Addin"; Flags: uninsdeletekey
+; ── 64 位 COM 视图 ──
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "SW-AI"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "mscoree.dll"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Both"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Assembly"; ValueData: "SWAIAddin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Class"; ValueData: "SWAI.SWAIAddin"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "CodeBase"; ValueData: "file:///{app}/SWAIAddin.dll"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\ProgId"; ValueType: string; ValueName: ""; ValueData: "SWAI.Addin"; Flags: uninsdeletekey
+
 ; ── 开机自启 API 服务 ──
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SWAIServer"; ValueData: """{app}\{#MyServerExeName}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-; ── 注册 COM（x86 DLL 必须用 32 位 RegAsm，注册到 32 位 COM 视图）──
-; SolidWorks 是 32 位进程，只找 32 位视图的 CLSID
-Filename: "{dotnet4032}\RegAsm.exe"; Parameters: "/codebase ""{app}\{#MyAppExeName}"""; Flags: runhidden; StatusMsg: "正在注册 COM 组件..."
-
 ; ── 立即启动聊天窗口（自动拉起后台服务）──
 Filename: "{app}\SWAIChat.exe"; Description: "打开 SWAI 聊天窗口"; Flags: nowait postinstall skipifsilent
 
@@ -89,10 +107,6 @@ Name: "{group}\启动 AI 服务(后台)"; Filename: "{app}\{#MyServerExeName}"
 Name: "{group}\使用说明"; Filename: "{app}\README-install.md"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\SWAIChat.exe"; Tasks: desktopicon
-
-[UninstallRun]
-; 注销 COM（32 位）
-Filename: "{dotnet4032}\RegAsm.exe"; Parameters: "/unregister ""{app}\{#MyAppExeName}"""; Flags: runhidden
 
 [UninstallDelete]
 ; 清理服务运行时产生的日志/配置（含 %APPDATA% 下的 config.json，里面有用户 API Key）

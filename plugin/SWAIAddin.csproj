@@ -7,8 +7,9 @@
     <AssemblyName>SWAIAddin</AssemblyName>
     <RootNamespace>SWAI</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
-    <Platform Condition="'$(Platform)' == ''">x86</Platform>
-    <!-- SolidWorks 主程序是 32 位进程，插件必须编译为 x86，否则 SolidWorks 无法加载 -->
+    <!-- AnyCPU：32 位和 64 位 SolidWorks 都能加载（CLR 按宿主进程位数自动选择） -->
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <!-- SolidWorks 版本不定（32/64 位皆有），AnyCPU 是最稳的选择 -->
     <!-- 生产环境建议签名: 使用 sn.exe 生成 SWAI.snk 并取消注释下方两行 -->
     <!-- <SignAssembly>true</SignAssembly> -->
     <!-- <AssemblyOriginatorKeyFile>SWAI.snk</AssemblyOriginatorKeyFile> -->
@@ -29,6 +30,23 @@
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+
+  <!-- AnyCPU：不锁位数，32 位/64 位 SolidWorks 均可加载 -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\AnyCPU\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\AnyCPU\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
     <ErrorReport>prompt</ErrorReport>
   </PropertyGroup>
 

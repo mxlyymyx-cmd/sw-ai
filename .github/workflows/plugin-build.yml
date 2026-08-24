@@ -91,7 +91,7 @@ jobs:
         run: |
           if (Test-Path "plugin/libs/SolidWorks.Interop.sldworks.dll") {
             Write-Host "✅ SolidWorks Interop DLL 已就绪，开始编译..."
-            msbuild plugin/SWAIAddin.csproj /p:Configuration=Release /p:Platform=x86
+            msbuild plugin/SWAIAddin.csproj /p:Configuration=Release /p:Platform=AnyCPU
             if ($LASTEXITCODE -eq 0) {
               Write-Host "✅ 编译成功"
             } else {
@@ -174,7 +174,7 @@ jobs:
         with:
           name: SWAI-Plugin-win32
           path: |
-            plugin\bin\x86\Release\SWAIAddin.dll
+            plugin\bin\AnyCPU\Release\SWAIAddin.dll
             plugin\install.ps1
             plugin\README-install.md
           if-no-files-found: warn
