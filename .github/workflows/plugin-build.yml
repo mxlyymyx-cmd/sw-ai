@@ -14,6 +14,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write   # 发布 GitHub Release 需要写权限（默认只读会 403）
 
     steps:
       - name: 📥 检出代码
