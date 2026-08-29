@@ -173,6 +173,7 @@ class ImpellerDesignResult:
                 v = v.value
             elif isinstance(v, ImpellerDesignInput):
                 continue  # 不序列化输入对象
-            if v not in (None, 0.0, "", 0):
-                result[k] = round(v, 4) if isinstance(v, float) else v
+            if v is None or v == "":
+                continue  # 只过滤空值，保留 0（0 是合法计算结果）
+            result[k] = round(v, 4) if isinstance(v, float) else v
         return result
