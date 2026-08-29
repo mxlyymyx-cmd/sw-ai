@@ -31,11 +31,14 @@ HIDDEN_IMPORTS = [
     "flange.generator",
     "flange.pipeline",
     "impeller.design",
+    "impeller.params",
     "impeller.blades",
     "impeller.generator",
     "impeller.volute",
     "axial.design",
+    "axial.params",
     "axial.blades",
+    "axial.generator",
 ]
 
 # ── 排除 ──
