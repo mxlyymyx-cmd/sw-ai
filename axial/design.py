@@ -565,6 +565,7 @@ def _compute_sections(
             cl=round(cl, 3),
             aoa=round(aoa, 2),
             Gamma=round(Gamma, 4),
+            Z=Z,
         )
         sections.append(section)
 
