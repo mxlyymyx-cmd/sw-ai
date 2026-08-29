@@ -255,7 +255,55 @@ def build_impeller_sw(
         part.Extension.SelectByID2("", "SKETCHSEGMENT", 0, 0, 0, True, 0, None, 0)
         part.FeatureManager.FeatureRevolve(True, False, False, False, False, 0, 0, 360.0, 0, False, False, False)
 
-        # Step 2~6 (practical when called from Windows)
+        # Step 2: 前盖（轮盖）旋转体
+        z_up = p.b1 / 1000.0        # 轮盖进口高度
+        z_edge = p.b1 * 0.3 / 1000.0  # 外缘收口高度
+        part.SketchManager.InsertSketch(True)
+        lines2 = [
+            (r0 / 1000.0, 0.0), (r0 / 1000.0, cover_t / 1000.0),
+            (r1 / 1000.0, z_up), (r2 / 1000.0, z_edge),
+            (r2 / 1000.0, 0.0), (r0 / 1000.0, 0.0),
+        ]
+        for i in range(len(lines2) - 1):
+            part.CreateLine2(*lines2[i], 0, *lines2[i + 1], 0)
+        part.SketchManager.InsertSketch(True)
+        part.ClearSelection2(True)
+        part.Extension.SelectByID2("", "SKETCHSEGMENT", 0, 0, 0, True, 0, None, 0)
+        part.FeatureManager.FeatureRevolve(True, False, False, False, False, 0, 0, 360.0, 0, False, False, False)
+
+        # Step 3: 叶片下缘 3D 样条（z=0，后盘侧）
+        profile = generate_blade_profile(r1, r2, p.beta1, p.beta2, n_points=20)
+        lower_pts = []
+        for pt in profile:
+            lower_pts.extend([pt["x"] / 1000.0, pt["y"] / 1000.0, 0.0])
+        part.SketchManager.Insert3DSketch(True)
+        part.SketchManager.CreateSpline(lower_pts)
+        part.SketchManager.Insert3DSketch(True)
+
+        # Step 4: 叶片上缘 3D 样条（z=b1，轮盖侧）
+        upper_pts = []
+        for pt in profile:
+            upper_pts.extend([pt["x"] / 1000.0, pt["y"] / 1000.0, p.b1 / 1000.0])
+        part.SketchManager.Insert3DSketch(True)
+        part.SketchManager.CreateSpline(upper_pts)
+        part.SketchManager.Insert3DSketch(True)
+
+        # Step 5: 放样生成第一枚叶片
+        part.ClearSelection2(True)
+        part.Extension.SelectByID2("3DSketch1", "SKETCH", 0, 0, 0, False, 0, None, 0)
+        part.Extension.SelectByID2("3DSketch2", "SKETCH", 0, 0, 0, True, 0, None, 0)
+        part.FeatureManager.InsertProtrusionBlend(
+            False, 0, False, True, 0, 0, 0, 0, 0, 0, 0, 0, False, False, False, 0
+        )
+
+        # Step 6: 圆周阵列 Z 个叶片
+        part.ClearSelection2(True)
+        part.Extension.SelectByID2("Blend1", "BODYFEATURE", 0, 0, 0, True, 0, None, 0)
+        part.FeatureManager.FeatureCircularPattern(
+            p.Z, 360.0, False, False, False, "Blend1"
+        )
+
+        part.ClearSelection2(True)
 
         if output_path:
             os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
