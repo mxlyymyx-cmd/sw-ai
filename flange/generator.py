@@ -212,9 +212,10 @@ def create_plate_flange(part, params: FlangeParams) -> bool:
             part.SketchManager.InsertSketch(True)
             part.ClearSelection2(True)
 
-            # 切除拉伸（通孔）
+            # 切除拉伸（通孔）— 深度按法兰总厚（主体 + 密封面）加余量，保证切穿
+            cut_depth = (thickness + seal_h) * 1.2 + 0.002
             feat_cut = feature_mgr.FeatureCut(
-                False, False, False, 0, 0, 1, 0.05,
+                False, False, False, 0, 0, 1, cut_depth,
                 0, False, False, False, False, 0, 0, False, False,
             )
 
@@ -308,6 +309,8 @@ def generate_sw_macro(params: FlangeParams) -> str:
     depth_f = f"{f / 1000}!"
     pcd_k = f"{k / 2000}!"
     r_bolt = f"{l / 2000}!"
+    # 螺栓孔切穿深度：法兰总厚（主体 c + 密封面 f）加余量，不再硬编码
+    depth_cut = f"{(c + f) * 1.2 / 1000 + 0.002}!"
 
     macro = f"""' SolidWorks 宏 — 参数化法兰盘 DN{dn} PN{pn}
 ' 自动生成 by solidworks-parametric v0.1.0
@@ -349,7 +352,7 @@ Sub main()
     Set skSegment = Part.SketchManager.CreateCircle({pcd_k}, 0#, 0#, {r_bolt}, 0#, 0#)
     Part.SketchManager.InsertSketch True
     Part.ClearSelection2 True
-    Set myFeature = Part.FeatureManager.FeatureCut(False, False, False, 0#, 0, 1, 0.05, 0, False, False, False, False, 0, 0, False, False)
+    Set myFeature = Part.FeatureManager.FeatureCut(False, False, False, 0#, 0, 1, {depth_cut}, 0, False, False, False, False, 0, 0, False, False)
     
     ' 圆周阵列
     Part.ClearSelection2 True
