@@ -112,7 +112,11 @@ class FlangeParams:
         )
 
     def to_dict(self) -> dict:
-        return {k: v for k, v in asdict(self).items() if v not in (None, 0.0, "", 0)}
+        # 只过滤 None 和空值，保留 0（0 是合法计算结果）
+        return {
+            k: v for k, v in asdict(self).items()
+            if v is not None and v != ""
+        }
 
 
 @dataclass
