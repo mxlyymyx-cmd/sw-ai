@@ -181,11 +181,55 @@ def design_impeller(inp: ImpellerDesignInput) -> ImpellerDesignResult:
     r.notes.append(f"Pfleiderer 公式计算叶片数 Z={Z_raw:.1f} → 取 Z={r.Z}")
 
     # ═══════════════════════════════════════════════════════════
-    # Step 8: 功率估算
+    # Step 7.5: 设计闭环验证（欧拉方程 + Stodola 滑移 + DeHaller）
+    #
+    # 完整出口速度三角形（β₂ 从切向测量）：
+    #   c₂u = u₂ − c₂r·cot(β₂)                （无限叶片数理论值）
+    #   Stodola 滑移（有限叶片数）: Δc₂u = (π/Z)·sin(β₂)·u₂
+    #   c₂u' = μ·u₂ − c₂r·cot(β₂)，μ = 1−(π/Z)sin(β₂)
+    #   欧拉理论全压: P_th = ρ·u₂·c₂u'
+    #   几何压力系数: ψ_geo = 2·c₂u'/u₂
+    #
+    # 闭环判据: η·ψ_geo vs 定型用的经验 ψ，偏差 ±20% 内为工程可接受；
+    # 定型尺寸仍以实测校准的经验 ψ 为准（闭环含未建模损失，系统性偏高）。
     # ═══════════════════════════════════════════════════════════
 
     eta = _efficiency_estimate(r.blade_type, ns)
     r.eta = eta
+
+    r.c1u = 0.0  # 无预旋设计
+    r.c2u = r.u2 - r.c2r * (math.cos(beta2_rad) / math.sin(beta2_rad))
+    r.slip_mu = 1.0 - (math.pi / r.Z) * math.sin(beta2_rad)
+    r.c2u_slip = r.slip_mu * r.u2 - r.c2r * (math.cos(beta2_rad) / math.sin(beta2_rad))
+    r.c2 = math.sqrt(r.c2u_slip**2 + r.c2r**2)
+
+    r.P_th = inp.rho * r.u2 * r.c2u_slip
+    r.psi_geo = 2.0 * r.c2u_slip / r.u2 if r.u2 > 0 else 0.0
+    r.psi_dev = (r.eta * r.psi_geo - r.psi) / r.psi if r.psi > 0 else 0.0
+
+    # 进出口相对速度 → DeHaller 扩散因子（防叶道分离）
+    r.w1 = math.sqrt(r.u1**2 + r.c0**2)  # c₁ ≈ c₀（无预旋）
+    r.w2 = math.sqrt(abs(r.u2 - r.c2u_slip) ** 2 + r.c2r**2)
+    r.dehaller = r.w2 / r.w1 if r.w1 > 0 else 0.0
+
+    if r.P_th > 0 and r.psi > 0:
+        if abs(r.psi_dev) <= 0.20:
+            r.notes.append(
+                f"欧拉闭环: P_th={r.P_th:.0f}Pa, 偏差{r.psi_dev:+.1%}（±20%内，可接受）")
+        elif abs(r.psi_dev) <= 0.35:
+            r.warnings.append(
+                f"欧拉闭环偏差{r.psi_dev:+.1%}（>±20%），建议 D₂ 或 β₂/Z 复核")
+        else:
+            r.warnings.append(
+                f"欧拉闭环偏差{r.psi_dev:+.1%}（>±35%），叶型参数 β₂/Z/φ 需复核")
+
+    if r.blade_type in (BladeType.BACKWARD, BladeType.AIRFOIL) and 0 < r.dehaller < 0.55:
+        r.warnings.append(
+            f"DeHaller 数 w₂/w₁={r.dehaller:.2f} < 0.55，叶道扩散过度，叶片易分离")
+
+    # ═══════════════════════════════════════════════════════════
+    # Step 8: 功率估算
+    # ═══════════════════════════════════════════════════════════
 
     # N_shaft = Q·P / (1000·η)
     N_shaft = Q_s * inp.P / (1000.0 * eta)
@@ -275,28 +319,30 @@ def _select_blade_type(ns: float, preferred: BladeType) -> BladeType:
 
 def _pressure_coefficient(blade_type: BladeType, ns: float) -> float:
     """
-    压力系数 ψ
+    压力系数 ψ = 2P/(ρ·u₂²)（Eck 约定）
 
-    经验取值。ψ 越大 → 同样直径下能产生更高压力。
-    
-    后向叶轮有 n_s 回归修正：
-      ψ ≈ 0.50 - 0.002·(n_s - 55)    （n_s 55~85 范围内）
-    其他叶型用固定推荐值。
+    按真实工业风机校准（2026-08 复核）：
+      4-72（后向机翼）: 8D@960rpm 实测 P=887Pa, u₂=40.2 → ψ=0.915
+                        10D@1450 实测 P=2532~3202Pa, u₂=75.9 → ψ=0.73~0.93
+      9-19（前向高压）: ψ ≈ 1.7~1.8
+    中国风机型号命名首位数字 ≈ 10·P/(ρu₂²)，据此换算为本约定（×2）。
+
+    后向叶轮有 n_s 回归修正：ψ ≈ 0.85 - 0.002·(n_s - 55)
     """
     base = {
-        BladeType.BACKWARD: 0.48,
-        BladeType.FORWARD: 0.75,
-        BladeType.RADIAL: 0.60,
-        BladeType.RADIAL_TIP: 0.52,
-        BladeType.AIRFOIL: 0.42,
-    }.get(blade_type, 0.50)
+        BladeType.BACKWARD: 0.85,
+        BladeType.FORWARD: 1.75,
+        BladeType.RADIAL: 1.15,
+        BladeType.RADIAL_TIP: 1.05,
+        BladeType.AIRFOIL: 0.88,
+    }.get(blade_type, 0.85)
 
-    # 后向叶轮用 n_s 修偏
-    if blade_type == BladeType.BACKWARD and 30 < ns < 100:
+    # 后向叶轮用 n_s 修偏（低比转速 → 高压力系数）
+    if blade_type in (BladeType.BACKWARD, BladeType.AIRFOIL) and 20 < ns < 110:
         adj = base - 0.002 * (ns - 55)
-        return round(_clamp(adj, 0.25, 0.65), 3)
+        return round(_clamp(adj, 0.65, 1.10), 3)
 
-    return round(_clamp(base, 0.20, 0.95), 3)
+    return round(_clamp(base, 0.60, 2.00), 3)
 
 
 def _flow_coefficient(blade_type: BladeType, beta2: float) -> float:
@@ -421,12 +467,12 @@ def _efficiency_estimate(blade_type: BladeType, ns: float) -> float:
     实际效率还取决于蜗壳匹配、制造精度等。
     """
     base = {
-        BladeType.BACKWARD: 0.80,
-        BladeType.FORWARD: 0.70,
-        BladeType.RADIAL: 0.73,
-        BladeType.RADIAL_TIP: 0.76,
-        BladeType.AIRFOIL: 0.83,
-    }.get(blade_type, 0.75)
+        BladeType.BACKWARD: 0.84,
+        BladeType.FORWARD: 0.72,
+        BladeType.RADIAL: 0.74,
+        BladeType.RADIAL_TIP: 0.78,
+        BladeType.AIRFOIL: 0.88,
+    }.get(blade_type, 0.80)
 
     # n_s 修正：在最佳比转速区间效率最高
     if 55 <= ns <= 80:

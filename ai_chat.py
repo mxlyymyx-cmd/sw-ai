@@ -41,6 +41,8 @@ from axial.params import AxialFanInput
 from axial.design import design_axial_fan as design_axial_engine
 from axial.generator import generate_vba_macro as gen_axial_macro
 
+from fan_selector import select_fan
+
 log = logging.getLogger("swai.chat")
 
 # ═══════════════════════════════════════════════════════════════
@@ -93,18 +95,20 @@ CHAT_SYSTEM_PROMPT = """你是 SW-AI 机械设计 AI 助手，集成在 SolidWor
 
 你可以设计以下零件（通过调用设计引擎完成精确计算）：
 1. flange（法兰盘）：必填 dn(公称通径 mm)、pn(公称压力 bar)。可选 flange_type(plate板式平焊/slip_on带颈平焊/weld_neck对焊/blind盲板)、seal_type(rf突面/ff全平面/mfm凹凸面)、material(如 Q235B/304/316L/20#)、n(螺栓孔数量)。
-2. impeller（离心风机叶轮）：必填 Q(流量 m³/h)、P(全压 Pa)、n(转速 r/min)。可选 blade_type(backward后向/forward前向/radial径向/airfoil机翼型)、material、volute(是否含蜗壳,默认true)。
-3. axial（轴流风机）：必填 Q、P、n。可选 airfoil(clark_y/ls_0413/ls_0409/raf_30/raf_38/naca_4412/naca_2412)、material、sections。
+2. impeller（离心风机叶轮）：必填 Q(流量 m³/h)、P(全压 Pa)。n(转速 r/min)可选——用户没给就不要追问，系统会自动选型推荐转速。可选 blade_type(backward后向/forward前向/radial径向/airfoil机翼型)、material、volute(是否含蜗壳,默认true)。
+3. axial（轴流风机）：必填 Q、P。n 同上可选。可选 airfoil(clark_y/ls_0413/ls_0409/raf_30/raf_38/naca_4412/naca_2412)、material、sections、circulation(equal/linear/variable)、nu(轮毂比)。
+4. select（风机选型）：用户说"设计一台风机/帮我选风机"且未指定离心或轴流时使用。必填 Q、P。n 可选。系统会自动比较离心/轴流方案并推荐最优。
 
 ## 你的行为规则
-1. 用户给出设计需求 → 提取参数。参数齐全 → intent="design"，把参数填进 params。
-2. 参数不全 → intent="ask"，reply 用中文礼貌追问缺什么，missing 列出缺失参数名。
+1. 用户给出设计需求 → 提取参数。必填参数齐全 → intent="design"，把参数填进 params（用户没给的 n 不要编造，直接省略）。
+2. 必填参数不全 → intent="ask"，reply 用中文礼貌追问缺什么，missing 列出缺失参数名。
 3. 纯闲聊或设计知识问答 → intent="chat"，用你的机械专业知识简短回答（中文，可给设计建议）。
 4. 数值换算要细心：注意单位（如 5000m³/h、2500Pa、1450r/min；转速说 "2900转" 就是 n=2900）。
 5. 用户没说的参数给默认值：材料 Q235B、叶型后向 backward、翼型 clark_y、法兰类型 plate、密封面 rf。
+6. 用户没给转速 n 时：不要追问，intent 直接设为 "design" 且 params 不含 n，系统自动选型。
 
 ## 输出格式（严格只输出一个 JSON 对象，不要任何其他文字）
-{"intent": "design|ask|chat", "type": "flange|impeller|axial", "params": {...}, "missing": [...], "reply": "你对用户说的话"}
+{"intent": "design|ask|chat", "type": "flange|impeller|axial|select", "params": {...}, "missing": [...], "reply": "你对用户说的话"}
 """
 
 
@@ -174,7 +178,9 @@ def _regex_intent(messages: list) -> dict:
 
     is_axial = any(kw in text_lower for kw in ["轴流", "axial"])
     is_impeller = any(kw in text_lower for kw in ["离心", "叶轮", "impeller", "蜗壳"]) and not is_axial
-    is_flange = any(kw in text_lower for kw in ["法兰", "flange", "dn", "pn"]) or (not is_axial and not is_impeller)
+    is_fan_generic = any(kw in text_lower for kw in ["风机", "选型", "fan"]) and not is_axial and not is_impeller
+    is_flange = any(kw in text_lower for kw in ["法兰", "flange", "dn", "pn"]) or \
+        (not is_axial and not is_impeller and not is_fan_generic)
 
     params = {}
     missing = []
@@ -204,21 +210,36 @@ def _regex_intent(messages: list) -> dict:
                 "params": params, "missing": missing,
                 "reply": "请提供公称通径和压力，例如：DN100 PN16 平焊法兰" if missing else ""}
     else:
+        # 风机类（impeller/axial/select）：n 可选，缺省自动选型
         _extract_num(r"(?:Q|q|流量)\s*[:=]?\s*(\d+[\.\d]*)", "Q")
         _extract_num(r"(?:P|p|全压|风压)\s*[:=]?\s*(\d+[\.\d]*)", "P")
         _extract_num(r"(?:n|转速|rpm|转)\s*[:=]?\s*(\d+[\.\d]*)", "n")
-        for k in ("Q", "P", "n"):
+        for k in ("Q", "P"):
             if k not in params:
                 missing.append(k)
-        type_name = "axial" if is_axial else "impeller"
+        type_name = "axial" if is_axial else ("impeller" if is_impeller else "select")
         return {"intent": "design" if not missing else "ask", "type": type_name,
                 "params": params, "missing": missing,
-                "reply": "请提供流量 Q(m³/h)、全压 P(Pa)、转速 n(r/min)，例如：Q=5000 P=2500 n=1450" if missing else ""}
+                "reply": "请提供流量 Q(m³/h) 和全压 P(Pa)，例如：Q=5000 P=2500（转速可不填，自动选型）" if missing else ""}
 
 
 # ═══════════════════════════════════════════════════════════════
 # 设计执行
 # ═══════════════════════════════════════════════════════════════
+
+def _auto_speed(part_type: str, Q: float, P: float):
+    """转速缺省时自动选型。返回 (n, note) 或 (0, error)。"""
+    prefer = "centrifugal" if part_type == "impeller" else "axial"
+    try:
+        sel = select_fan(Q=Q, P=P, prefer=prefer)
+    except ValueError as e:
+        return 0, f"选型失败: {e}"
+    if sel.best is None:
+        return 0, f"Q={Q:.0f}m³/h P={P:.0f}Pa 无可行{('离心' if part_type=='impeller' else '轴流')}方案，请指定转速或改换机型"
+    n = sel.best.n
+    note = f"⚙️ 转速自动选型 → {n:.0f} r/min（n_s={sel.best.ns:.1f}，共 {len(sel.candidates)} 个候选）"
+    return n, note
+
 
 def _design_and_macro(part_type: str, params: dict) -> dict:
     """
@@ -247,18 +268,49 @@ def _design_and_macro(part_type: str, params: dict) -> dict:
             return {"ok": True, "summary": fp.summary,
                     "macro": macro, "name": f"Flange_DN{dn}_PN{pn}_{fp.flange_type.value}"}
 
+        if part_type == "select":
+            # 风机选型：自动比较离心/轴流，推荐最优方案后走对应引擎
+            Q = float(params.get("Q", 0))
+            P = float(params.get("P", 0))
+            if Q <= 0 or P <= 0:
+                return {"ok": False, "error": "风机选型需要 Q, P（且都为正数）"}
+            try:
+                sel = select_fan(Q=Q, P=P, prefer="auto")
+            except ValueError as e:
+                return {"ok": False, "error": f"选型失败: {e}"}
+            if sel.best is None:
+                return {"ok": False, "error": f"Q={Q:.0f}m³/h P={P:.0f}Pa 无可行方案，"
+                                              f"请确认工况或指定机型（离心/轴流）"}
+            best = sel.best
+            sub_type = "impeller" if best.machine == "centrifugal" else "axial"
+            sub_params = dict(params)
+            sub_params["n"] = best.n
+            result = _design_and_macro(sub_type, sub_params)
+            if result.get("ok"):
+                machine_name = "离心风机" if best.machine == "centrifugal" else "轴流风机"
+                sel_note = (f"\n\n⚙️ 风机选型 → {machine_name} @ {best.n:.0f} r/min"
+                            f"（n_s={best.ns:.1f}，候选 {len(sel.candidates)} 个）")
+                result["summary"] = sel.summary + sel_note + "\n\n" + result["summary"]
+                result["type"] = sub_type
+            return result
+
         if part_type == "impeller":
             Q = float(params.get("Q", 0))
             P = float(params.get("P", 0))
             n = float(params.get("n", 0))
-            if Q <= 0 or P <= 0 or n <= 0:
-                return {"ok": False, "error": "叶轮需要 Q, P, n（且都为正数）"}
+            if Q <= 0 or P <= 0:
+                return {"ok": False, "error": "叶轮需要 Q, P（且都为正数）"}
+            auto_note = ""
+            if n <= 0:
+                n, auto_note = _auto_speed("impeller", Q, P)
+                if n <= 0:
+                    return {"ok": False, "error": auto_note}
             blade_type = params.get("blade_type", "backward")
             material = params.get("material", "Q235B")
             inp = ImpellerDesignInput(Q=Q, P=P, n=n, blade_type=blade_type, material=material)
             design = design_impeller_engine(inp)
             macro = gen_impeller_macro(design)
-            result = {"ok": True, "summary": design.summary,
+            result = {"ok": True, "summary": (auto_note + "\n\n" if auto_note else "") + design.summary,
                       "macro": macro, "name": f"Impeller_Q{Q:.0f}_P{P:.0f}_n{n:.0f}"}
             # 蜗壳宏
             if params.get("volute", True):
@@ -277,15 +329,23 @@ def _design_and_macro(part_type: str, params: dict) -> dict:
             Q = float(params.get("Q", 0))
             P = float(params.get("P", 0))
             n = float(params.get("n", 0))
-            if Q <= 0 or P <= 0 or n <= 0:
-                return {"ok": False, "error": "轴流风机需要 Q, P, n（且都为正数）"}
+            if Q <= 0 or P <= 0:
+                return {"ok": False, "error": "轴流风机需要 Q, P（且都为正数）"}
+            auto_note = ""
+            if n <= 0:
+                n, auto_note = _auto_speed("axial", Q, P)
+                if n <= 0:
+                    return {"ok": False, "error": auto_note}
             airfoil = params.get("airfoil", "clark_y")
             material = params.get("material", "Q235B")
             sections = int(params.get("sections", 5))
-            inp = AxialFanInput(Q=Q, P=P, n=n, airfoil=airfoil, material=material, sections=sections)
+            circulation = params.get("circulation", "equal")
+            nu = float(params.get("nu", 0))
+            inp = AxialFanInput(Q=Q, P=P, n=n, airfoil=airfoil, material=material,
+                                sections=sections, circulation=circulation, nu=nu)
             design = design_axial_engine(inp)
             macro = gen_axial_macro(design)
-            return {"ok": True, "summary": design.summary,
+            return {"ok": True, "summary": (auto_note + "\n\n" if auto_note else "") + design.summary,
                     "macro": macro, "name": f"Axial_Q{Q:.0f}_P{P:.0f}_n{n:.0f}"}
 
         return {"ok": False, "error": f"不支持的零件类型: {part_type}"}
@@ -363,14 +423,15 @@ def chat(messages: list, use_llm: bool = True) -> dict:
                 "extra_macro": "", "extra_name": "", "llm": llm_used}
 
     # 组装自然语言回复
-    type_names = {"flange": "法兰", "impeller": "离心风机叶轮", "axial": "轴流风机"}
-    header = (f"✅ {type_names.get(part_type, part_type)}设计完成！\n"
+    type_names = {"flange": "法兰", "impeller": "离心风机叶轮", "axial": "轴流风机", "select": "风机"}
+    display_type = result.get("type") or part_type
+    header = (f"✅ {type_names.get(display_type, display_type)}设计完成！\n"
               f"{result['summary']}\n\n"
               f"📜 建模宏已生成（{result['name']}），正在为你自动建模…")
     if result.get("extra_macro"):
         header += f"\n（含蜗壳宏 {result['extra_name']}）"
 
-    return {"reply": header, "action": "build", "type": part_type, "params": params,
+    return {"reply": header, "action": "build", "type": display_type, "params": params,
             "summary": result["summary"], "macro": result["macro"], "name": result["name"],
             "extra_macro": result.get("extra_macro", ""), "extra_name": result.get("extra_name", ""),
             "llm": llm_used}
@@ -387,9 +448,12 @@ if __name__ == "__main__":
         [{"role": "user", "content": "DN100 PN16 平焊法兰"}],
         [{"role": "user", "content": "你好"}],
         [{"role": "user", "content": "做个轴流风机"}],
+        [{"role": "user", "content": "设计一台离心风机 Q=5000 P=2500"}],       # 无 n → 自动选型
+        [{"role": "user", "content": "帮我设计一台风机 Q=20000 P=800"}],        # 泛指 → 自动选机型
+        [{"role": "user", "content": "轴流风机 Q=30000 P=400"}],                # 无 n 轴流
     ]
     for t in tests:
         r = chat(t, use_llm=False)
         print(f"\n用户: {t[0]['content']}")
         print(f"意图: {r['action']}  type={r['type']}  macro={len(r['macro'])}字符")
-        print(f"回复: {r['reply'][:120]}")
+        print(f"回复: {r['reply'][:150]}")

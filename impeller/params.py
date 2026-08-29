@@ -89,6 +89,14 @@ class ImpellerDesignResult:
     c0: float = 0.0             # 进口流速 (m/s)
     c2r: float = 0.0            # 出口径向速度 (m/s)
 
+    # ═══ 完整速度三角形（闭环计算） ═══
+    c1u: float = 0.0            # 进口旋绕速度 (m/s)，无预旋设计 = 0
+    c2u: float = 0.0            # 出口旋绕速度理论值（无限叶片数）(m/s)
+    c2u_slip: float = 0.0       # 滑移修正后的出口旋绕速度 (m/s)
+    c2: float = 0.0             # 出口绝对速度 (m/s)
+    w1: float = 0.0             # 进口相对速度 (m/s)
+    w2: float = 0.0             # 出口相对速度 (m/s)
+
     # ═══ 主要尺寸 (mm) ═══
     D2: float = 0.0             # 叶轮外径
     D1: float = 0.0             # 叶片进口直径
@@ -105,11 +113,18 @@ class ImpellerDesignResult:
     delta: float = 0.0          # 叶片厚度 (mm)
 
     # ═══ 性能估算 ═══
-    psi: float = 0.0            # 压力系数
+    psi: float = 0.0            # 压力系数（经验假设值，用于定型）
     phi: float = 0.0            # 流量系数
     eta: float = 0.0            # 估算效率
     N_shaft: float = 0.0        # 轴功率 (kW)
     N_motor: float = 0.0        # 电机功率 (kW)
+
+    # ═══ 设计闭环验证（欧拉方程 + Stodola 滑移） ═══
+    slip_mu: float = 0.0        # Stodola 滑移系数 μ = 1-(π/Z)sinβ₂
+    P_th: float = 0.0           # 欧拉理论全压（含滑移）Pa
+    psi_geo: float = 0.0        # 几何压力系数 ψ_geo = 2c₂u'/u₂
+    psi_dev: float = 0.0         # 闭环偏差 (η·ψ_geo − ψ)/ψ，±20% 内可接受
+    dehaller: float = 0.0        # DeHaller 数 w₂/w₁，≥0.55 防分离
     
     # ═══ 强度校核 ═══
     sigma_r: float = 0.0        # 径向应力 (MPa)
@@ -139,6 +154,9 @@ class ImpellerDesignResult:
             f"    圆周速度  u₂  = {self.u2:.1f} m/s",
             f"    圆周速度  u₁  = {self.u1:.1f} m/s",
             f"    进口速度  c₀  = {self.c0:.1f} m/s",
+            f"    进口相对  w₁  = {self.w1:.1f} m/s",
+            f"    出口相对  w₂  = {self.w2:.1f} m/s",
+            f"    出口旋绕  c₂u'= {self.c2u_slip:.1f} m/s",
             f"",
             f"  主要尺寸 (mm)",
             f"    外径      D₂  = {self.D2:.1f}",
@@ -158,11 +176,26 @@ class ImpellerDesignResult:
             f"    轴功率    Nₛ = {self.N_shaft:.2f} kW",
             f"    电机功率  Nₘ = {self.N_motor:.2f} kW",
         ]
+        if self.P_th > 0:
+            lines += [
+                f"",
+                f"  设计闭环验证（欧拉方程）",
+                f"    滑移系数  μ   = {self.slip_mu:.3f}",
+                f"    理论全压  P_th = {self.P_th:.0f} Pa（滑移修正后）",
+                f"    几何ψ_geo = {self.psi_geo:.3f}  vs  经验ψ={self.psi:.3f}",
+                f"    闭环偏差  = {self.psi_dev:+.1%}",
+                f"    DeHaller  = {self.dehaller:.2f}  (w₂/w₁)",
+            ]
         if self.warnings:
             lines.append(f"")
             lines.append(f"  ⚠️  警告:")
             for w in self.warnings:
                 lines.append(f"    • {w}")
+        if self.notes:
+            lines.append(f"")
+            lines.append(f"  💡  说明:")
+            for n in self.notes:
+                lines.append(f"    • {n}")
         return "\n".join(lines)
 
     def to_dict(self) -> dict:

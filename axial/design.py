@@ -10,6 +10,7 @@
 """
 
 import math
+from dataclasses import replace
 from typing import Optional
 
 from .params import (
@@ -40,16 +41,62 @@ def _round_step(val: float, step: float) -> float:
 
 def design_axial_fan(inp: AxialFanInput) -> AxialFanResult:
     """
-    轴流风机设计 — 主入口
+    轴流风机设计 — 主入口（含叶根过载自动修正）
+
+    先按比转速经验选轮毂比设计；若闭环校验发现叶根过载
+    （Lieblein Df > 0.60 / 需用升力 > 1.1 / DeHaller < 0.60），
+    且轮毂比为自动选取（非用户指定），则逐步增大轮毂比重算，
+    直到载荷回到限值内或达到 ν=0.70 上限。
+
+    原理：叶根载荷 ∝ Γ/u_hub，增大 ν → u_hub 上升 → 叶根减载。
+
+    Args:
+        inp: 设计输入
+
+    Returns:
+        AxialFanResult
+    """
+    r = _design_core(inp)
+
+    if inp.nu > 0:
+        return r  # 用户指定轮毂比，不自动修正
+
+    nu0 = r.nu
+    tries = 0
+    while (r.Df_max > 0.60 or r.cl_req_max > 1.10 or 0 < r.dehaller_min < 0.60) \
+            and r.nu < 0.70 and tries < 9:
+        tries += 1
+        try:
+            r = _design_core(replace(inp, nu=round(r.nu + 0.05, 3)))
+        except ValueError:
+            break
+
+    if r.nu > nu0:
+        if r.Df_max <= 0.60 and r.cl_req_max <= 1.10 and r.dehaller_min >= 0.60:
+            r.notes.append(
+                f"叶根过载自动修正: 轮毂比 ν {nu0:.2f} → {r.nu:.2f}，"
+                f"Df/cl_req 已回到限值内")
+        else:
+            r.warnings.append(
+                f"轮毂比已自动修正至 ν={r.nu:.2f}，叶根仍过载，"
+                f"建议提高转速、两级串联或改用离心/混流方案")
+
+    return r
+
+
+def _design_core(inp: AxialFanInput) -> AxialFanResult:
+    """
+    轴流风机设计 — 单次完整流程（含闭环验证）
 
     10步完整流程：
     1. 比转速定型 + 轮毂比确定
     2. 叶轮直径计算
     3. 叶片数确定
-    4. 环量分布设计
+    4. 环量分布设计（归一化保证全压闭环）
     5. 各截面速度三角形
     6. 弦长和安装角计算
     7. 叶片扭角分布
+    7.5 设计闭环验证（欧拉全压 + Lieblein 扩散因子 + DeHaller）
     8. 性能预估
     9. 强度校核（初步）
     10. 结果汇总
@@ -235,6 +282,53 @@ def design_axial_fan(inp: AxialFanInput) -> AxialFanResult:
             c_u2 = s.u - c_a_actual / math.tan(beta2_rad)
             c_u2_sum += c_u2
     r.c_u2_avg = c_u2_sum / N_s
+
+    # ═══════════════════════════════════════════════════════════
+    # Step 7.5: 设计闭环验证（欧拉 + Lieblein + DeHaller）
+    #
+    # 欧拉全压（面积加权）: P_th = ρ·Σ(u·c_u2·r)/Σr
+    #   均匀 c_a 下质量流量 ∝ 2πr·dr，等距截面权重 ∝ r
+    #   等环量设计 P_th 恒等于 ρ·ω·Γ/2π；变环量靠归一化闭合
+    # 闭环判据: η·P_th ≈ P（目标），偏差 ±15% 内可接受
+    # ═══════════════════════════════════════════════════════════
+
+    r.phi = r.c_a / r.u_tip if r.u_tip > 0 else 0.0
+    r.psi = 2.0 * inp.P / (inp.rho * r.u_tip**2) if r.u_tip > 0 else 0.0
+
+    num = sum(s.u * s.c_u2 * s.r for s in sections)
+    den = sum(s.r for s in sections)
+    r.P_th = inp.rho * num / den if den > 0 else 0.0
+    r.P_dev = (r.eta * r.P_th - inp.P) / inp.P if inp.P > 0 else 0.0
+
+    r.Df_max = max((s.Df for s in sections), default=0.0)
+    r.dehaller_min = min(
+        (s.w2 / s.w1 for s in sections if s.w1 > 0), default=0.0)
+    r.cl_req_max = max((s.cl_req for s in sections), default=0.0)
+
+    if r.P_th > 0:
+        if abs(r.P_dev) <= 0.15:
+            r.notes.append(
+                f"欧拉闭环: P_th={r.P_th:.0f}Pa, 偏差{r.P_dev:+.1%}（±15%内，可接受）")
+        else:
+            r.warnings.append(
+                f"欧拉闭环偏差{r.P_dev:+.1%}（>±15%），环量分布/轮毂比需复核")
+
+    if r.Df_max > 0.60:
+        r.warnings.append(
+            f"Lieblein Df_max={r.Df_max:.2f} > 0.60，叶背分离风险，"
+            f"建议增大弦长/叶片数或降低载荷")
+    elif r.Df_max > 0.45:
+        r.notes.append(f"Lieblein Df_max={r.Df_max:.2f}（边界区 0.45~0.60）")
+
+    if 0 < r.dehaller_min < 0.72:
+        r.warnings.append(
+            f"DeHaller w₂/w₁_min={r.dehaller_min:.2f} < 0.72，叶道扩散过度，"
+            f"建议降低轮毂比或减小载荷")
+
+    if r.cl_req_max > 1.1:
+        r.warnings.append(
+            f"需用升力 cl_max={r.cl_req_max:.2f} > 1.1（弦长被实度上限截断），"
+            f"建议增加叶片数 Z 或换高升力翼型")
 
     # ═══════════════════════════════════════════════════════════
     # Step 8: 性能预估
@@ -442,16 +536,49 @@ def _compute_sections(
     sections = []
     L = R - r_hub  # 叶高 mm
 
+    # ── 径向位置（先定截面半径，环量归一化需要） ──
+    radii = []
     for i in range(N):
-        # ── 径向位置 ──
         # 从 0.05 开始避开轮毂，到 0.95 避免叶尖效应
         t = (i + 0.5) / N  # 截面中心位置
         r = r_hub + t * L
-
         if i == 0:
             r = r_hub + 0.05 * L  # 离轮毂 5% 叶高
         if i == N - 1:
             r = R - 0.05 * L  # 离叶尖 5% 叶高
+        radii.append(r)
+
+    # ── 环量分布（原始形状） ──
+    if circulation == CirculationType.EQUAL:
+        # 等环量（自由旋涡）：Γ = 2πr·c_u = const
+        Gammas = [Gamma_avg] * N
+    elif circulation == CirculationType.LINEAR:
+        # 线性变化环量：叶根加载（+50%），叶尖减载（防叶尖分离/降噪）
+        Gammas = [
+            Gamma_avg * (1.0 - 0.5 * (rr / R - nu) / (1.0 - nu))
+            for rr in radii
+        ]
+    else:
+        # 变环量（指数分布）：Γ ∝ r^(1-k_exp)，k_exp ≈ 0.7
+        k_exp = 0.7
+        r_avg = (r_hub + R) / 2.0
+        Gammas = [
+            Gamma_avg * (r_avg / rr) ** (k_exp - 1.0)
+            for rr in radii
+        ]
+
+    # ── 环量归一化：r 加权平均环量 = Γ_avg（欧拉全压闭环的关键） ──
+    # 均匀 c_a 下质量流量 ∝ 2πr·dr，欧拉全压按 r 加权环量闭合；
+    # 线性/变环量若不归一化，实际全压会系统性偏离目标（可达 ±25%）
+    w_sum = sum(radii)
+    g_sum = sum(g * rr for g, rr in zip(Gammas, radii))
+    if g_sum > 0 and w_sum > 0:
+        scale = Gamma_avg * w_sum / g_sum
+        Gammas = [g * scale for g in Gammas]
+
+    for i in range(N):
+        # ── 径向位置 ──
+        r = radii[i]
 
         r_star = r / R  # 无量纲半径
         r_pct = (r - r_hub) / L if L > 0 else 0
@@ -459,26 +586,9 @@ def _compute_sections(
         # ── 圆周速度 ──
         u = omega * r / 1000.0  # m/s
 
-        # ── 环量分布 ──
-        if circulation == CirculationType.EQUAL:
-            # 等环量（自由旋涡）：c_u · r = const
-            # Γ = 2πr · c_u = const → c_u = Γ_avg / (2πr)
-            Gamma = Gamma_avg
-            c_u2 = Gamma / (2.0 * math.pi * (r / 1000.0))
-        elif circulation == CirculationType.LINEAR:
-            # 线性变化环量：从叶根到叶尖线性减少
-            # 叶根加载更多
-            k = 1.0 - 0.5 * (r_star - nu) / (1.0 - nu) if r > r_hub else 1.0
-            Gamma = Gamma_avg * k
-            c_u2 = Gamma / (2.0 * math.pi * (r / 1000.0))
-        else:
-            # 变环量（指数分布）：c_u · r^k = const, k ≈ 0.5~0.8
-            k_exp = 0.7
-            # 假设平均环量对应平均半径处
-            r_avg = (r_hub + R) / 2.0
-            const_val = Gamma_avg * (r_avg / 1000.0) ** (k_exp - 1.0) / (2.0 * math.pi)
-            c_u2 = const_val / (r / 1000.0) ** k_exp
-            Gamma = 2.0 * math.pi * c_u2 * (r / 1000.0)
+        # ── 本截面环量（已归一化） ──
+        Gamma = Gammas[i]
+        c_u2 = Gamma / (2.0 * math.pi * (r / 1000.0))
 
         # 进口无预旋（c_u1 = 0，最常见的轴流设计）
         c_u1 = 0.0
@@ -520,30 +630,28 @@ def _compute_sections(
         aoa = airfoil.design_aoa
         cl = airfoil.design_cl
 
-        # 叶片实度修正：Schlichting 修正
-        # 实际轴流叶片相邻叶片干涉会降低升力
-        # 先按孤立翼型计算弦长，再修正
-        if w_m > 0 and abs(math.sin(math.radians(chi))) > 1e-6:
-            # 弦长 c = 2 * Γ / (Z * cl * w_m)
+        # 弦长（Kutta-Joukowski）：c = 2Γ/(Z·cl·w_m)
+        if w_m > 0:
             c_raw = 2000.0 * Gamma / (Z * cl * w_m)  # m → mm
         else:
             c_raw = 50.0  # 默认值
 
-        # 限制弦长合理范围
+        # 弦长限制（实度 σ = c/栅距 ∈ [0.4, 1.5]）
         pitch = 2.0 * math.pi * r / Z  # 栅距 mm
-        c = _clamp(c_raw, 0.3 * pitch, 1.5 * pitch)
+        c = _clamp(c_raw, 0.4 * pitch, 1.5 * pitch)
+        sigma = c / pitch if pitch > 0 else 0.0
 
-        # 最大厚度
+        # 实际弦长下的需用升力系数（弦长被实度上限截断 → cl_req 上升）
+        cl_req = 2000.0 * Gamma / (Z * w_m * c) if (w_m > 0 and c > 0) else 0.0
+
+        # Lieblein 扩散因子: Df = 1 − w₂/w₁ + Δc_u/(2σw₁)，限值 0.60
+        if w1 > 0 and sigma > 0:
+            Df = 1.0 - w2 / w1 + abs(c_u2 - c_u1) / (2.0 * sigma * w1)
+        else:
+            Df = 0.0
+
+        # 最大厚度（用最终弦长，避免实度修正后 t 失配）
         t_max = c * airfoil.max_thickness_pct / 100.0
-
-        # ── 实度检查 ──
-        sigma = c / pitch if pitch > 0 else 0
-        if sigma < 0.4:
-            # 实度过小，增大弦长
-            c = 0.4 * pitch
-        elif sigma > 1.5:
-            # 实度过大，减小弦长
-            c = 1.5 * pitch
 
         section = BladeSection(
             r=round(r, 2),
@@ -566,6 +674,10 @@ def _compute_sections(
             aoa=round(aoa, 2),
             Gamma=round(Gamma, 4),
             Z=Z,
+            c_u2=round(c_u2, 3),
+            w_m=round(w_m, 3),
+            Df=round(Df, 4),
+            cl_req=round(cl_req, 3),
         )
         sections.append(section)
 

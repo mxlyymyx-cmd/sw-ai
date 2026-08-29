@@ -162,6 +162,12 @@ class BladeSection:
     Gamma: float          # 环量 m²/s
     Z: int = 0            # 叶片数（0 = 未指定，solidity 返回 0）
 
+    # ── 闭环校验字段 ──
+    c_u2: float = 0.0     # 出口旋绕分速 m/s
+    w_m: float = 0.0      # 平均相对速度 m/s
+    Df: float = 0.0       # Lieblein 扩散因子（限值 0.60，超限叶背分离）
+    cl_req: float = 0.0   # 实际弦长下的需用升力系数（限值 1.1）
+
     @property
     def solidity(self) -> float:
         """实度 σ = c / t_pitch（栅距 t = 2πr/Z）"""
@@ -207,6 +213,17 @@ class AxialFanResult:
     u_hub: float = 0.0          # 轮毂圆周速度 m/s
     c_a: float = 0.0            # 轴向流速 m/s
     c_u2_avg: float = 0.0       # 圆周分速平均值 m/s
+
+    # ═══ 无量纲系数 ═══
+    phi: float = 0.0            # 流量系数 φ = c_a/u_t
+    psi: float = 0.0            # 压力系数 ψ = 2P/(ρ·u_t²)
+
+    # ═══ 设计闭环验证（欧拉 + Lieblein + DeHaller） ═══
+    P_th: float = 0.0           # 欧拉理论全压（面积加权）Pa
+    P_dev: float = 0.0          # 闭环偏差 (η·P_th − P)/P，±15% 内可接受
+    Df_max: float = 0.0         # 最大 Lieblein 扩散因子（限值 0.60）
+    dehaller_min: float = 0.0   # 最小 DeHaller 数 w₂/w₁（限值 0.72）
+    cl_req_max: float = 0.0     # 最大需用升力系数（限值 1.1）
 
     # ═══ 叶片参数 ═══
     Z: int = 0                  # 叶片数
@@ -278,18 +295,32 @@ class AxialFanResult:
         if self.sections:
             lines.append(f"")
             lines.append(f"  截面分布（叶根 → 叶尖）:")
-            lines.append(f"  {'r(mm)':>8} {'r*':>6} {'c(mm)':>8} {'chi(°)':>8} "
-                         f"{'β1(°)':>8} {'β2(°)':>8} {'θ(°)':>6}")
-            lines.append(f"  {'─'*8} {'─'*6} {'─'*8} {'─'*8} {'─'*8} {'─'*8} {'─'*6}")
+            lines.append(f"  {'r(mm)':>8} {'r*':>6} {'c(mm)':>8} {'σ':>6} {'chi(°)':>7} "
+                         f"{'β1(°)':>7} {'β2(°)':>7} {'θ(°)':>6} {'Df':>6}")
+            lines.append(f"  {'─'*8} {'─'*6} {'─'*8} {'─'*6} {'─'*7} "
+                         f"{'─'*7} {'─'*7} {'─'*6} {'─'*6}")
             for sec in self.sections:
                 lines.append(f"  {sec.r:>8.1f} {sec.r_star:>6.3f} {sec.c:>8.1f} "
-                             f"{sec.chi:>8.2f} {sec.beta1:>8.2f} "
-                             f"{sec.beta2:>8.2f} {sec.theta:>6.2f}")
+                             f"{sec.solidity:>6.2f} {sec.chi:>7.2f} {sec.beta1:>7.2f} "
+                             f"{sec.beta2:>7.2f} {sec.theta:>6.2f} {sec.Df:>6.2f}")
 
         lines.append(f"")
         lines.append(f"  功率")
         lines.append(f"    轴功率    Nₛ = {self.N_shaft:.2f} kW")
         lines.append(f"    电机功率  Nₘ = {self.N_motor:.2f} kW")
+
+        if self.P_th > 0:
+            lines += [
+                f"",
+                f"  设计闭环验证（欧拉方程 + Lieblein）",
+                f"    流量系数  φ     = {self.phi:.3f}",
+                f"    压力系数  ψ     = {self.psi:.3f}",
+                f"    理论全压  P_th  = {self.P_th:.0f} Pa（面积加权）",
+                f"    闭环偏差        = {self.P_dev:+.1%}（±15%内可接受）",
+                f"    Lieblein  Df_max = {self.Df_max:.2f}  (限值 0.60)",
+                f"    DeHaller  w₂/w₁_min = {self.dehaller_min:.2f}  (限值 0.72)",
+                f"    需用升力  cl_max = {self.cl_req_max:.2f}  (限值 1.1)",
+            ]
 
         if self.safety_factor > 0:
             lines.append(f"")
@@ -302,6 +333,11 @@ class AxialFanResult:
             lines.append(f"  ⚠️  警告:")
             for w in self.warnings:
                 lines.append(f"    • {w}")
+        if self.notes:
+            lines.append(f"")
+            lines.append(f"  💡  说明:")
+            for n in self.notes:
+                lines.append(f"    • {n}")
 
         return "\n".join(lines)
 

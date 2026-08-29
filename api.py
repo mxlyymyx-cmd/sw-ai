@@ -46,6 +46,10 @@ from axial.generator import (
 # ── AI 聊天引擎 ──
 from ai_chat import chat as ai_chat, is_llm_configured, get_llm_settings
 
+# ── 选型 + 性能曲线 ──
+from fan_selector import select_fan
+from perf import perf_curve
+
 # ═══════════════════════════════════════════════════════════════
 # Flask App
 # ═══════════════════════════════════════════════════════════════
@@ -98,8 +102,8 @@ def health():
     log.info("GET /api/health")
     return ok({
         "status": "ok",
-        "version": "1.0.0",
-        "engines": ["flange", "impeller", "axial"],
+        "version": "1.1.0",
+        "engines": ["flange", "impeller", "axial", "select", "curve"],
     })
 
 
@@ -129,7 +133,7 @@ def list_models():
                 "params": {
                     "Q": {"type": "float", "required": True, "description": "流量 (m³/h)"},
                     "P": {"type": "float", "required": True, "description": "全压 (Pa)"},
-                    "n": {"type": "float", "required": True, "description": "转速 (r/min)"},
+                    "n": {"type": "float", "default": 0, "description": "转速 (r/min，缺省=自动选型推荐)"},
                     "blade_type": {"type": "str", "default": "backward", "choices": ["forward", "backward", "radial", "radial_tip", "airfoil"]},
                     "material": {"type": "str", "default": "Q235B"},
                     "volute": {"type": "bool", "default": True, "description": "是否包含蜗壳设计"},
@@ -142,10 +146,22 @@ def list_models():
                 "params": {
                     "Q": {"type": "float", "required": True, "description": "流量 (m³/h)"},
                     "P": {"type": "float", "required": True, "description": "全压 (Pa)"},
-                    "n": {"type": "float", "required": True, "description": "转速 (r/min)"},
+                    "n": {"type": "float", "default": 0, "description": "转速 (r/min，缺省=自动选型推荐)"},
                     "airfoil": {"type": "str", "default": "clark_y", "choices": ["clark_y", "ls_0413", "ls_0409", "raf_30", "raf_38", "naca_4412", "naca_2412"]},
                     "material": {"type": "str", "default": "Q235B"},
                     "sections": {"type": "int", "default": 5},
+                    "circulation": {"type": "str", "default": "equal", "choices": ["equal", "linear", "variable"]},
+                    "nu": {"type": "float", "default": 0, "description": "轮毂比 ν（0=自动）"},
+                },
+            },
+            {
+                "id": "select",
+                "name": "风机选型",
+                "description": "给定 Q/P 自动比较离心与轴流方案，推荐机型和转速",
+                "params": {
+                    "Q": {"type": "float", "required": True, "description": "流量 (m³/h)"},
+                    "P": {"type": "float", "required": True, "description": "全压 (Pa)"},
+                    "prefer": {"type": "str", "default": "auto", "choices": ["auto", "centrifugal", "axial"]},
                 },
             },
         ],
@@ -401,8 +417,20 @@ def design_impeller():
         P = float(data.get("P", 0))
         n = float(data.get("n", 0))
 
-        if Q <= 0 or P <= 0 or n <= 0:
-            return fail("Q, P, n 必须为正数", "INVALID_PARAMS")
+        if Q <= 0 or P <= 0:
+            return fail("Q, P 必须为正数", "INVALID_PARAMS")
+
+        # 转速缺省 → 自动选型推荐
+        auto_note = ""
+        if n <= 0:
+            try:
+                sel = select_fan(Q=Q, P=P, prefer="centrifugal")
+            except ValueError as e:
+                return fail(str(e), "DESIGN_ERROR")
+            if sel.best is None:
+                return fail(f"Q={Q:.0f} P={P:.0f} 无可行离心方案，请指定转速或改用轴流", "NO_SOLUTION")
+            n = sel.best.n
+            auto_note = f"转速自动选型 → {n:.0f} r/min（n_s={sel.best.ns:.1f}）"
 
         blade_type = data.get("blade_type", "backward")
         material = data.get("material", "Q235B")
@@ -416,7 +444,8 @@ def design_impeller():
 
         result = {
             "design": design.to_dict(),
-            "summary": design.summary,
+            "summary": (auto_note + "\n\n" if auto_note else "") + design.summary,
+            "auto_speed": bool(auto_note),
             "volute": None,
         }
 
@@ -474,28 +503,185 @@ def design_axial():
         P = float(data.get("P", 0))
         n = float(data.get("n", 0))
 
-        if Q <= 0 or P <= 0 or n <= 0:
-            return fail("Q, P, n 必须为正数", "INVALID_PARAMS")
+        if Q <= 0 or P <= 0:
+            return fail("Q, P 必须为正数", "INVALID_PARAMS")
+
+        # 转速缺省 → 自动选型推荐
+        auto_note = ""
+        if n <= 0:
+            try:
+                sel = select_fan(Q=Q, P=P, prefer="axial")
+            except ValueError as e:
+                return fail(str(e), "DESIGN_ERROR")
+            if sel.best is None:
+                return fail(f"Q={Q:.0f} P={P:.0f} 无可行轴流方案，请指定转速或改用离心", "NO_SOLUTION")
+            n = sel.best.n
+            auto_note = f"转速自动选型 → {n:.0f} r/min（n_s={sel.best.ns:.1f}）"
 
         airfoil = data.get("airfoil", "clark_y")
         material = data.get("material", "Q235B")
         sections = int(data.get("sections", 5))
+        circulation = data.get("circulation", "equal")
+        nu = float(data.get("nu", 0))
 
         inp = AxialFanInput(
             Q=Q, P=P, n=n,
             airfoil=airfoil,
             material=material,
             sections=sections,
+            circulation=circulation,
+            nu=nu,
         )
         design = design_axial_engine(inp)
 
         result = {
             "design": design.to_dict(),
-            "summary": design.summary,
+            "summary": (auto_note + "\n\n" if auto_note else "") + design.summary,
+            "auto_speed": bool(auto_note),
             "sections": [s.to_dict() for s in design.sections],
         }
 
         return ok(result)
+
+    except ValueError as e:
+        return fail(str(e), "DESIGN_ERROR")
+    except Exception as e:
+        return server_error(e)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 风机选型
+# ═══════════════════════════════════════════════════════════════
+
+
+@app.route("/api/design/select", methods=["POST"])
+def design_select():
+    """
+    风机选型：自动比较离心/轴流 + 标准转速，推荐最优方案
+
+    请求体:
+        {"Q": 20000, "P": 800, "prefer": "auto"}
+
+    返回:
+        {"success": true, "data": {
+            "Q": ..., "P": ...,
+            "best": {"machine": "centrifugal|axial", "n": ..., "ns": ...},
+            "candidates": [...],
+            "summary": "..."
+        }}
+    """
+    data = request.get_json(force=True)
+    log.info(f"POST /api/design/select  data={data}")
+
+    try:
+        Q = float(data.get("Q", 0))
+        P = float(data.get("P", 0))
+        prefer = data.get("prefer", "auto")
+
+        if Q <= 0 or P <= 0:
+            return fail("Q, P 必须为正数", "INVALID_PARAMS")
+
+        sel = select_fan(Q=Q, P=P, prefer=prefer)
+
+        return ok({
+            "Q": Q,
+            "P": P,
+            "prefer": prefer,
+            "best": None if sel.best is None else {
+                "machine": sel.best.machine,
+                "machine_name": sel.best.machine_name,
+                "n": sel.best.n,
+                "ns": sel.best.ns,
+                "score": sel.best.score,
+                "design": sel.best.design.to_dict(),
+            },
+            "candidates": [
+                {
+                    "machine": c.machine,
+                    "machine_name": c.machine_name,
+                    "n": c.n,
+                    "ns": c.ns,
+                    "score": c.score,
+                }
+                for c in sel.candidates
+            ],
+            "summary": sel.summary,
+        })
+
+    except ValueError as e:
+        return fail(str(e), "DESIGN_ERROR")
+    except Exception as e:
+        return server_error(e)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 性能曲线
+# ═══════════════════════════════════════════════════════════════
+
+
+@app.route("/api/design/curve", methods=["POST"])
+def design_curve():
+    """
+    生成整机性能曲线（P-Q + η-Q + N-Q）
+
+    请求体:
+        {"type": "impeller|axial", "Q": 5000, "P": 2500, "n": 1450}   # n 缺省自动选型
+
+    返回:
+        {"success": true, "data": {
+            "machine": "...", "n": ..., "Q_d": ..., "P_d": ..., "eta_d": ..., "N_d": ...,
+            "Q_stall": ...,
+            "points": [{"Q": ..., "P": ..., "eta": ..., "N": ...}, ...]
+        }}
+    """
+    data = request.get_json(force=True)
+    log.info(f"POST /api/design/curve  data={data}")
+
+    try:
+        machine = data.get("type", "")
+        Q = float(data.get("Q", 0))
+        P = float(data.get("P", 0))
+        n = float(data.get("n", 0))
+
+        if Q <= 0 or P <= 0:
+            return fail("Q, P 必须为正数", "INVALID_PARAMS")
+
+        if machine == "impeller":
+            prefer = "centrifugal"
+        elif machine == "axial":
+            prefer = "axial"
+        else:
+            return fail("type 必须为 impeller 或 axial", "INVALID_PARAMS")
+
+        # 转速缺省 → 自动选型
+        if n <= 0:
+            try:
+                sel = select_fan(Q=Q, P=P, prefer=prefer)
+            except ValueError as e:
+                return fail(str(e), "DESIGN_ERROR")
+            if sel.best is None:
+                return fail("无可行方案，请指定转速", "NO_SOLUTION")
+            n = sel.best.n
+
+        if machine == "impeller":
+            inp = ImpellerDesignInput(Q=Q, P=P, n=n, blade_type=data.get("blade_type", "backward"))
+            design = design_impeller_engine(inp)
+        else:
+            inp = AxialFanInput(Q=Q, P=P, n=n, airfoil=data.get("airfoil", "clark_y"))
+            design = design_axial_engine(inp)
+
+        curve = perf_curve(design)
+
+        return ok({
+            "machine": curve.machine,
+            "n": curve.n,
+            "Q_d": curve.Q_d,
+            "P_d": curve.P_d,
+            "eta_d": curve.eta_d,
+            "N_d": curve.N_d,
+            "Q_stall": curve.Q_stall,
+            "points": [p.to_dict() for p in curve.points],
+        })
 
     except ValueError as e:
         return fail(str(e), "DESIGN_ERROR")
@@ -558,8 +744,18 @@ def generate_macro():
             Q = float(params.get("Q", 0))
             P = float(params.get("P", 0))
             n = float(params.get("n", 0))
-            if Q <= 0 or P <= 0 or n <= 0:
-                return fail("叶轮需要 Q, P, n 参数", "INVALID_PARAMS")
+            if Q <= 0 or P <= 0:
+                return fail("叶轮需要 Q, P 参数（n 可缺省自动选型）", "INVALID_PARAMS")
+
+            # 转速缺省 → 自动选型推荐
+            if n <= 0:
+                try:
+                    sel = select_fan(Q=Q, P=P, prefer="centrifugal")
+                except ValueError as e:
+                    return fail(str(e), "DESIGN_ERROR")
+                if sel.best is None:
+                    return fail(f"Q={Q:.0f} P={P:.0f} 无可行离心方案，请指定转速", "NO_SOLUTION")
+                n = sel.best.n
 
             blade_type = params.get("blade_type", "backward")
             material = params.get("material", "Q235B")
@@ -583,13 +779,26 @@ def generate_macro():
             Q = float(params.get("Q", 0))
             P = float(params.get("P", 0))
             n = float(params.get("n", 0))
-            if Q <= 0 or P <= 0 or n <= 0:
-                return fail("轴流风机需要 Q, P, n 参数", "INVALID_PARAMS")
+            if Q <= 0 or P <= 0:
+                return fail("轴流风机需要 Q, P 参数（n 可缺省自动选型）", "INVALID_PARAMS")
+
+            # 转速缺省 → 自动选型推荐
+            if n <= 0:
+                try:
+                    sel = select_fan(Q=Q, P=P, prefer="axial")
+                except ValueError as e:
+                    return fail(str(e), "DESIGN_ERROR")
+                if sel.best is None:
+                    return fail(f"Q={Q:.0f} P={P:.0f} 无可行轴流方案，请指定转速", "NO_SOLUTION")
+                n = sel.best.n
 
             airfoil = params.get("airfoil", "clark_y")
             material = params.get("material", "Q235B")
             sections = int(params.get("sections", 5))
-            inp = AxialFanInput(Q=Q, P=P, n=n, airfoil=airfoil, material=material, sections=sections)
+            circulation = params.get("circulation", "equal")
+            nu = float(params.get("nu", 0))
+            inp = AxialFanInput(Q=Q, P=P, n=n, airfoil=airfoil, material=material,
+                                sections=sections, circulation=circulation, nu=nu)
             design = design_axial_engine(inp)
             macro = gen_axial_macro(design)
             name = f"Axial_Q{Q:.0f}_P{P:.0f}_n{n:.0f}"
@@ -678,8 +887,10 @@ def main():
     GET  /api/chat/config     — LLM 配置状态
     POST /api/nlp             — 自然语言 → 结构化参数
     POST /api/design/flange   — 法兰设计计算
-    POST /api/design/impeller — 离心风机叶轮设计
-    POST /api/design/axial    — 轴流风机设计
+    POST /api/design/impeller — 离心风机叶轮设计（n 可缺省）
+    POST /api/design/axial    — 轴流风机设计（n 可缺省）
+    POST /api/design/select   — 风机选型（离心 vs 轴流 + 转速推荐）
+    POST /api/design/curve    — 性能曲线（P-Q + η-Q + 失速边界）
     POST /api/macro           — 生成 VBA 宏代码
     GET  /api/macro/<id>      — 查看生成的宏
 

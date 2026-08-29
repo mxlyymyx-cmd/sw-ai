@@ -27,6 +27,14 @@ SolidWorks 参数化法兰盘 — CLI 入口
     # 轴流风机
     python main.py axial -Q 20000 -P 800 -n 1450
     python main.py axial -Q 20000 -P 800 -n 1450 --macro
+
+    # 风机选型（自动推荐机型 + 转速）
+    python main.py select -Q 20000 -P 800
+    python main.py select -Q 20000 -P 800 --curve
+
+    # 离心/轴流 不指定转速 → 自动选型
+    python main.py fan -Q 5000 -P 2500 --volute
+    python main.py axial -Q 50000 -P 300 --circulation equal
 """
 
 import sys
@@ -52,6 +60,9 @@ from axial.params import AxialFanInput, AirfoilType as AxialAirfoilType, Circula
 from axial.design import design_axial_fan, calc_ns as axial_calc_ns, estimate_diameter
 from axial.blades import generate_blade_points, export_csv as axial_export_csv, export_sw_curve as axial_export_sw_curve
 from axial.generator import generate_vba_macro as gen_axial_macro, design_and_generate as axial_design_and_generate
+
+from fan_selector import select_fan
+from perf import perf_curve
 
 
 def cmd_query(args):
@@ -145,8 +156,51 @@ def cmd_batch(args):
     results = batch_auto(args.input_file, output_dir=args.output_dir)
 
 
+def _export_curve(design, Q: float, P: float, n: float, curve_dir: str):
+    """导出性能曲线 CSV + SVG"""
+    os.makedirs(curve_dir, exist_ok=True)
+    curve = perf_curve(design)
+    prefix = f"{curve.machine.capitalize()}_{Q:.0f}m3h_{P:.0f}Pa_{n:.0f}rpm"
+    csv_path = os.path.join(curve_dir, f"{prefix}_curve.csv")
+    svg_path = os.path.join(curve_dir, f"{prefix}_curve.svg")
+    curve.export_csv(csv_path)
+    curve.export_svg(svg_path)
+    print(f"\n📈 性能曲线: {csv_path}")
+    print(f"            {svg_path}")
+
+
+def cmd_select(args):
+    """风机选型：机型（离心 vs 轴流）+ 转速推荐"""
+    try:
+        sel = select_fan(Q=args.Q, P=args.P, prefer=args.prefer)
+    except ValueError as e:
+        print(f"❌ {e}")
+        sys.exit(1)
+
+    print(sel.summary)
+    if sel.best is None:
+        sys.exit(1)
+
+    print(f"\n{'='*55}")
+    print(f"  推荐方案完整设计结果（{sel.best.machine_name} @ {sel.best.n:.0f} r/min）")
+    print(f"{'='*55}")
+    print(sel.best.design.summary)
+
+    if args.curve:
+        _export_curve(sel.best.design, args.Q, args.P, sel.best.n, args.curve_dir)
+
+
 def cmd_fan_design(args):
-    """离心风机叶轮设计"""
+    """离心风机叶轮设计（转速缺省时自动选型）"""
+    if args.n <= 0:
+        sel = select_fan(Q=args.Q, P=args.P, prefer="centrifugal")
+        if sel.best is None:
+            print(f"❌ 无可行离心方案（Q={args.Q} m³/h, P={args.P} Pa），"
+                  f"建议尝试 axial 或 select 命令")
+            sys.exit(1)
+        args.n = sel.best.n
+        print(f"⚙️ 未指定转速 → 自动选型: 离心风机 @ {args.n:.0f} r/min "
+              f"(n_s={sel.best.ns:.1f}, 候选 {len(sel.candidates)} 个)")
     inp = ImpellerDesignInput(
         Q=args.Q,
         P=args.P,
@@ -192,6 +246,10 @@ def cmd_fan_design(args):
             pts = generate_blade_profile(r1, r2, design.beta1, design.beta2, n_points=50)
             pts_3d = generate_3d_blade(pts, design.b1, design.b2)
             export_csv(pts_3d, args.profile)
+
+        # ── 性能曲线导出 ──
+        if args.curve:
+            _export_curve(design, args.Q, args.P, args.n, args.curve_dir)
 
     except ValueError as e:
         print(f"❌ 设计失败: {e}")
@@ -244,7 +302,16 @@ def cmd_fan_speed(args):
 
 
 def cmd_axial_design(args):
-    """轴流风机设计"""
+    """轴流风机设计（转速缺省时自动选型）"""
+    if args.n <= 0:
+        sel = select_fan(Q=args.Q, P=args.P, prefer="axial")
+        if sel.best is None:
+            print(f"❌ 无可行轴流方案（Q={args.Q} m³/h, P={args.P} Pa），"
+                  f"建议尝试 fan 或 select 命令")
+            sys.exit(1)
+        args.n = sel.best.n
+        print(f"⚙️ 未指定转速 → 自动选型: 轴流风机 @ {args.n:.0f} r/min "
+              f"(n_s={sel.best.ns:.1f}, 候选 {len(sel.candidates)} 个)")
     inp = AxialFanInput(
         Q=args.Q,
         P=args.P,
@@ -252,6 +319,8 @@ def cmd_axial_design(args):
         airfoil=args.airfoil,
         material=args.material,
         sections=args.sections,
+        circulation=args.circulation,
+        nu=args.nu,
     )
     try:
         design = design_axial_fan(inp)
@@ -281,6 +350,10 @@ def cmd_axial_design(args):
             os.makedirs(os.path.dirname(args.export) or ".", exist_ok=True)
             pts = generate_blade_points(design.sections, design.airfoil, n_per_section=30)
             axial_export_csv(pts, args.export)
+
+        # ── 性能曲线导出 ──
+        if args.curve:
+            _export_curve(design, args.Q, args.P, args.n, args.curve_dir)
 
     except ValueError as e:
         print(f"❌ 设计失败: {e}")
@@ -388,8 +461,9 @@ def main():
   python main.py list --pn 16                     列出规格
 
   # 离心风机叶轮
-  python main.py fan Q=5000 P=2500 n=1450         完整设计
-  python main.py ns Q=5000 P=2500 n=1450           计算比转速
+  python main.py fan -Q 5000 -P 2500 -n 1450      完整设计
+  python main.py fan -Q 5000 -P 2500 --volute     转速自动选型 + 蜗壳
+  python main.py ns -Q 5000 -P 2500 -n 1450        计算比转速
   python main.py interactive                       交互模式
 
   # 轴流风机
@@ -397,6 +471,11 @@ def main():
   python main.py axial -Q 20000 -P 800 -n 1450     中压通用轴流
   python main.py axial -Q 5000 -P 2000 -n 2900     高压轴流
   python main.py axial -Q 20000 -P 800 -n 1450 --macro  轴流设计+宏
+  python main.py axial -Q 50000 -P 300 --circulation var --nu 0.5
+
+  # 风机选型
+  python main.py select -Q 20000 -P 800            机型+转速推荐
+  python main.py select -Q 20000 -P 800 --curve    附性能曲线
         """,
     )
     sub = parser.add_subparsers(dest="command", help="子命令")
@@ -439,11 +518,21 @@ def main():
     # ── interactive ──
     sub.add_parser("interactive", help="交互模式（法兰 + 叶轮）")
 
+    # ── 风机选型 ──
+    p_select = sub.add_parser("select", help="风机选型（离心 vs 轴流 + 转速推荐）")
+    p_select.add_argument("-Q", type=float, required=True, help="流量 (m³/h)")
+    p_select.add_argument("-P", type=float, required=True, help="全压 (Pa)")
+    p_select.add_argument("--prefer", default="auto",
+                          choices=["auto", "centrifugal", "axial"],
+                          help="机型偏好（默认自动）")
+    p_select.add_argument("--curve", action="store_true", help="导出性能曲线 CSV + SVG")
+    p_select.add_argument("--curve-dir", default="./outputs", help="曲线输出目录")
+
     # ── 离心风机叶轮设计 ──
     p_fan = sub.add_parser("fan", help="离心风机叶轮设计")
     p_fan.add_argument("-Q", type=float, required=True, help="流量 (m³/h)")
     p_fan.add_argument("-P", type=float, required=True, help="全压 (Pa)")
-    p_fan.add_argument("-n", type=float, required=True, help="转速 (r/min)")
+    p_fan.add_argument("-n", type=float, default=0, help="转速 (r/min，0=自动选型)")
     p_fan.add_argument("--type", default="backward",
                        choices=[t.value for t in BladeType], help="叶型")
     p_fan.add_argument("--material", default="Q235B", help="材料")
@@ -451,6 +540,8 @@ def main():
     p_fan.add_argument("--macro-dir", default="./outputs", help="宏输出目录")
     p_fan.add_argument("--profile", type=str, help="导出叶片型线 CSV 路径")
     p_fan.add_argument("--volute", action="store_true", help="匹配蜗壳设计")
+    p_fan.add_argument("--curve", action="store_true", help="导出性能曲线 CSV + SVG")
+    p_fan.add_argument("--curve-dir", default="./outputs", help="曲线输出目录")
 
     # ── 比转速 ──
     p_ns = sub.add_parser("ns", help="计算比转速")
@@ -480,14 +571,20 @@ def main():
     p_axial = sub.add_parser("axial", help="轴流风机设计")
     p_axial.add_argument("-Q", type=float, required=True, help="流量 (m³/h)")
     p_axial.add_argument("-P", type=float, required=True, help="全压 (Pa)")
-    p_axial.add_argument("-n", type=float, required=True, help="转速 (r/min)")
+    p_axial.add_argument("-n", type=float, default=0, help="转速 (r/min，0=自动选型)")
     p_axial.add_argument("--airfoil", default="clark_y",
                          choices=[t.value for t in AxialAirfoilType], help="翼型")
     p_axial.add_argument("--material", default="Q235B", help="材料")
     p_axial.add_argument("--sections", type=int, default=5, help="径向截面数")
+    p_axial.add_argument("--circulation", default="equal",
+                         choices=[t.value for t in CirculationType],
+                         help="环量分布（equal=等环量, linear=线性, variable=变环量）")
+    p_axial.add_argument("--nu", type=float, default=0, help="轮毂比 ν（0=自动）")
     p_axial.add_argument("--macro", action="store_true", help="生成 VBA 宏")
     p_axial.add_argument("--macro-dir", default="./outputs", help="宏输出目录")
     p_axial.add_argument("--export", type=str, help="导出叶片点云 CSV 路径")
+    p_axial.add_argument("--curve", action="store_true", help="导出性能曲线 CSV + SVG")
+    p_axial.add_argument("--curve-dir", default="./outputs", help="曲线输出目录")
 
     args = parser.parse_args()
 
@@ -504,6 +601,7 @@ def main():
         "list": cmd_list,
         "batch": cmd_batch,
         "interactive": cmd_interactive,
+        "select": cmd_select,
         "fan": cmd_fan_design,
         "ns": cmd_fan_ns,
         "speed": cmd_fan_speed,
