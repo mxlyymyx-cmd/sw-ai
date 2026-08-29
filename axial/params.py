@@ -160,11 +160,14 @@ class BladeSection:
 
     # ── 环量 ──
     Gamma: float          # 环量 m²/s
+    Z: int = 0            # 叶片数（0 = 未指定，solidity 返回 0）
 
     @property
     def solidity(self) -> float:
-        """实度 c / t_pitch（栅距 t = 2πr/Z）"""
-        return 0.0
+        """实度 σ = c / t_pitch（栅距 t = 2πr/Z）"""
+        if self.Z <= 0 or self.r <= 0:
+            return 0.0
+        return self.c * self.Z / (2.0 * math.pi * self.r)
 
     def to_dict(self) -> dict:
         result = {}
@@ -172,6 +175,7 @@ class BladeSection:
             if isinstance(v, float):
                 v = round(v, 4)
             result[k] = v
+        result["solidity"] = round(self.solidity, 4)
         return result
 
 
@@ -302,15 +306,17 @@ class AxialFanResult:
         return "\n".join(lines)
 
     def to_dict(self) -> dict:
-        """序列化为字典"""
+        """序列化为字典（保留 0 值：0 是合法计算结果，不能丢弃）"""
+        sections_data = [s.to_dict() for s in self.sections]
         result = {}
         for k, v in asdict(self).items():
             if isinstance(v, (AirfoilType, CirculationType)):
                 v = v.value
             elif isinstance(v, AxialFanInput):
                 continue
-            elif isinstance(v, list) and v and isinstance(v[0], BladeSection):
-                v = [s.to_dict() for s in v]
-            if v not in (None, 0.0, "", 0, [], {}):
-                result[k] = round(v, 4) if isinstance(v, float) else v
+            elif k == "sections":
+                v = sections_data
+            if v is None or v == "" or (isinstance(v, (list, dict)) and not v):
+                continue
+            result[k] = round(v, 4) if isinstance(v, float) else v
         return result
