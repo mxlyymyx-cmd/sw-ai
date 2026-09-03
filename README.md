@@ -4,18 +4,22 @@
 >
 > 「你说规格，AI 画图」
 
-SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自然语言规格到 SolidWorks 3D 模型的完整自动化流程。目前涵盖法兰、离心风机叶轮、轴流风机、风机选型、性能曲线五个模块，每个设计模块都包含独立的设计计算引擎（含闭环验证）和 SolidWorks COM API 建模能力。
+SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自然语言规格到 SolidWorks 3D 模型的完整自动化流程。目前涵盖法兰、离心风机叶轮、轴流风机、风机选型、性能曲线五个模块，每个设计模块都包含独立的设计计算引擎（含闭环验证）和 SolidWorks COM API 建模能力。全仓库 344 项离线单元测试，CI 打包前强制通过。
 
 ---
 
 ## 模块
 
 ### 🔧 法兰参数化 (`flange/`)
-- GB/T 9119-2010（PN10/16/25/40 × DN10-300，共 60 规格）
-- 支持 GB/T 9116-2010 带颈平焊法兰、GB/T 9115-2010 对焊法兰
+- **4 种法兰类型 × 240 规格**（PN10/16/25/40 × DN10-300 全覆盖）：
+  - `plate` 板式平焊 — GB/T 9119-2010
+  - `slip_on` 带颈平焊 — GB/T 9116-2010 / HG/T 20592-2009（含颈部 N/H/S 尺寸）
+  - `weld_neck` 对焊 — GB/T 9115-2010 / HG/T 20592-2009（锥颈过渡）
+  - `blind` 法兰盖 — GB/T 9123-2010
 - AI 自然语言→参数提取（LLM + 正则双模式）
-  - `"DN100 PN16 平焊法兰，4个螺栓孔"` → 结构化参数
-- SolidWorks COM API 自动建模
+  - `"DN100 PN16 带颈平焊法兰，8个螺栓孔"` → 结构化参数
+- SolidWorks COM API 旋转建模：4 类型统一轮廓生成 + 螺栓孔圆周阵列切除
+- **E2E 体积校验**：SolidWorks 实测体积 vs Pappus 旋转体解析解（含螺栓孔弓形重叠修正），7 组基准偏差 0.000%，基准值固化在单元测试中
 - 完整 Pipeline：自然语言 → 参数提取 → 模型生成
 
 ### 🌀 离心风机叶轮 (`impeller/`)
@@ -61,7 +65,10 @@ SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自�
 
 ### 📈 性能曲线 (`perf.py`)
 - 从设计结果生成整机 **P-Q / η-Q / N-Q 全性能曲线**
-- 离心：按叶型区分的无量纲 ψ 形状（Eck 归一化，4-72/9-19 实测校准）
+- 离心：按叶型区分的无量纲 ψ 形状（Eck 归一化）
+- **实测数据标定**（非纯理论估算）：
+  - 4-72（后向）/ 9-19（前向）/ 典型轴流风机样本点校准滑移与效率系数
+  - 曲线峰值压力/流量/效率对齐样本点，标定偏差固化在 `tests/test_perf_calibration.py`
 - 轴流：陡压曲线 + **失速边界标注** + 稳定裕度计算
 - 相似律变转速换算：Q∝n，P∝n²，N∝n³
 - CSV + SVG 图表导出（可直接放设计报告）
@@ -74,8 +81,10 @@ SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自�
 # 法兰
 python main.py query DN100 PN16                   # 查询法兰参数（离线）
 python main.py extract "DN100 PN16 平焊法兰"      # AI 提取参数
-python main.py generate DN100 PN16                # 生成 SW 3D 模型
-python main.py generate DN100 PN16 --type neck    # 带颈法兰
+python main.py generate DN100 PN16                # 生成 SW 3D 模型（默认板式平焊）
+python main.py generate DN100 PN16 --type slip_on     # 带颈平焊法兰
+python main.py generate DN100 PN16 --type weld_neck   # 对焊法兰（锥颈）
+python main.py generate DN100 PN16 --type blind       # 法兰盖（盲板）
 
 # 离心风机叶轮
 python main.py fan -Q 5000 -P 2500 -n 1450                   # 整机设计
@@ -180,18 +189,43 @@ C# SolidWorks Add-in，与 API 服务通信：
 
 ---
 
+## 🧪 开发与测试
+
+```bash
+pip install pytest
+python -m pytest tests/ -q          # 全量运行，约 0.5s
+```
+
+**344 项单元测试，纯离线**（不需要 SolidWorks / LLM / 网络），覆盖：
+
+| 测试文件 | 内容 | 数量 |
+|----------|------|------|
+| `test_flange_standards.py` | 4 类型 × 4 PN × DN10-300 全表几何不变量 + 关键规格 spot check | 253 |
+| `test_flange_generator.py` | 半剖轮廓结构、螺栓孔几何、SolidWorks E2E 体积基准回归 | 42 |
+| `test_fan_selector.py` | 比转速公式、6 类典型工况选型、评分排序、prefer 强制机型 | 17 |
+| `test_perf_calibration.py` | 性能曲线标定点回归（4-72/9-19/轴流样本点偏差） | 16 |
+| `test_ai_chat.py` | 正则模式意图识别、4 类法兰参数提取、转速缺省自动选型、LLM JSON 解析 | 16 |
+
+体积基准值来自 SolidWorks 2022 实测（见 `e2e_flange.py`），几何回归 = 解析解逐位对比。
+
+**CI**：`.github/workflows/build.yml` 与 `plugin-build.yml` 在打包前强制跑 `pytest`，测试不过不放行。
+
+---
+
 ## 项目统计
 
 | 指标 | 数值 |
 |------|------|
-| 总代码行数 | 10,206 |
-| Python | 8,459 行 |
-| C# | 1,747 行 |
+| 总代码行数 | 11,867 |
+| Python（引擎） | 9,264 行 |
+| Python（测试） | 856 行 |
+| C#（插件） | 1,747 行 |
+| 单元测试 | 344 项（全离线，<1s） |
 | 模块数 | 5（法兰 / 叶轮 / 轴流 / 选型 / 性能曲线） |
-| 法兰规格 | 60（GB/T 9119-2010, PN10/16/25/40, DN10-300） |
+| 法兰规格 | 240（4 类型 × PN10/16/25/40 × DN10-300） |
 | 叶轮叶型 | 5（前向/径向/径向出口/后向/机翼型） |
 | 轴流翼型 | 7（CLARK-Y/LS×2/RAF×2/NACA×2） |
-| 设计校验 | 欧拉闭环 + Stodola 滑移 + Lieblein + DeHaller |
+| 设计校验 | 欧拉闭环 + Stodola 滑移 + Lieblein + DeHaller + E2E 体积 |
 | 协议 | MIT |
 
 ---

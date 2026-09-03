@@ -2,11 +2,18 @@
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
 
 # Build output
 bin/
 obj/
 dist/
+build/
+outputs/
+*.egg-info/
+
+# SolidWorks macros (CLI 生成的临时产物)
+*.swp
 
 # IDE
 .vs/
