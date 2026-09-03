@@ -68,7 +68,7 @@ from perf import perf_curve
 def cmd_query(args):
     """查询国标法兰参数"""
     try:
-        params = lookup(args.dn, args.pn)
+        params = lookup(args.dn, args.pn, args.type)
         print(f"\n📐 {params.standard}")
         print(params.summary)
     except ValueError as e:
@@ -94,8 +94,7 @@ def cmd_extract(args):
 def cmd_generate(args):
     """直接生成（跳过 AI 提取，用指定参数）"""
     try:
-        params = lookup(args.dn, args.pn)
-        params.flange_type = FlangeType(args.type)
+        params = lookup(args.dn, args.pn, args.type)
     except ValueError as e:
         print(f"❌ {e}")
         sys.exit(1)
@@ -112,8 +111,7 @@ def cmd_generate(args):
 def cmd_macro(args):
     """生成 VBA 宏（跨平台方案）"""
     try:
-        params = lookup(args.dn, args.pn)
-        params.flange_type = FlangeType(args.type)
+        params = lookup(args.dn, args.pn, args.type)
     except ValueError as e:
         print(f"❌ {e}")
         sys.exit(1)
@@ -484,6 +482,8 @@ def main():
     p_query = sub.add_parser("query", help="查询国标法兰参数")
     p_query.add_argument("dn", type=int, help="公称通径，如 100")
     p_query.add_argument("pn", type=int, help="公称压力，如 16")
+    p_query.add_argument("--type", default="plate", choices=[t.value for t in FlangeType],
+                       help="法兰类型 (default: plate)")
 
     # ── extract ──
     p_extract = sub.add_parser("extract", help="AI 从自然语言提取参数")

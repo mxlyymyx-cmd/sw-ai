@@ -361,15 +361,13 @@ def design_flange():
         if dn <= 0 or pn <= 0:
             return fail("DN 和 PN 必须为正整数", "INVALID_PARAMS")
 
-        # 查国标
+        # 查国标（按类型返回对应尺寸，含带颈法兰颈部数据）
         if is_supported(dn, pn):
-            params = lookup(dn, pn)
+            params = lookup(dn, pn, data.get("flange_type", "plate"))
         else:
             return fail(f"DN{dn} PN{pn} 不在国标数据库中", "NOT_SUPPORTED")
 
         # 覆盖用户参数
-        if data.get("flange_type"):
-            params.flange_type = FlangeType(data["flange_type"])
         if data.get("seal_type"):
             params.seal_type = SealType(data["seal_type"])
         if data.get("material"):
@@ -728,12 +726,10 @@ def generate_macro():
                 return fail("法兰需要 dn 和 pn 参数", "INVALID_PARAMS")
 
             if is_supported(dn, pn):
-                fp = lookup(dn, pn)
+                fp = lookup(dn, pn, params.get("flange_type", "plate"))
             else:
                 return fail(f"DN{dn} PN{pn} 不在数据库中", "NOT_SUPPORTED")
 
-            if params.get("flange_type"):
-                fp.flange_type = FlangeType(params["flange_type"])
             if params.get("material"):
                 fp.material = params["material"]
 

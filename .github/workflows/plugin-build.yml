@@ -109,7 +109,16 @@ jobs:
         shell: pwsh
         run: |
           pip install -r requirements-plugin.txt
-          pip install pyinstaller
+          pip install pyinstaller pytest
+
+      - name: ✅ 单元测试（设计引擎/法兰/选型/聊天）
+        shell: pwsh
+        run: |
+          python -m pytest tests/ -q
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ 单元测试未通过，终止打包"
+            exit 1
+          }
 
       - name: 📦 打包 Python API 服务为独立 exe（静默后台，无黑窗口）
         shell: pwsh

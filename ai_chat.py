@@ -201,7 +201,11 @@ def _regex_intent(messages: list) -> dict:
             params["pn"] = int(m.group(1))
         else:
             missing.append("pn")
-        type_map = {"平焊": "plate", "带颈": "slip_on", "对焊": "weld_neck", "盲板": "blind"}
+        # 长词优先，避免"带颈平焊"被"平焊"抢先命中
+        type_map = {"带颈对焊": "weld_neck", "对焊": "weld_neck",
+                    "带颈平焊": "slip_on", "带颈": "slip_on",
+                    "盲板": "blind", "法兰盖": "blind",
+                    "平焊": "plate", "板式": "plate"}
         for kw, v in type_map.items():
             if kw in text:
                 params["flange_type"] = v
@@ -255,9 +259,7 @@ def _design_and_macro(part_type: str, params: dict) -> dict:
                 return {"ok": False, "error": "法兰需要 DN 和 PN 参数"}
             if not is_supported(dn, pn):
                 return {"ok": False, "error": f"DN{dn} PN{pn} 不在国标数据库中，支持范围见 /api/models"}
-            fp = lookup(dn, pn)
-            if params.get("flange_type"):
-                fp.flange_type = FlangeType(params["flange_type"])
+            fp = lookup(dn, pn, params.get("flange_type", "plate"))
             if params.get("seal_type"):
                 fp.seal_type = SealType(params["seal_type"])
             if params.get("material"):

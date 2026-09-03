@@ -2,8 +2,12 @@
 风机性能曲线生成 — P-Q / η-Q 曲线 + 变转速相似换算
 
 从设计工况点出发，按无量纲相似原理生成整条性能曲线：
-  离心风机: ψ/ψ_d 由叶型决定的后弯抛物线（Eck 归一化形状）
-  轴流风机: 更陡的压力曲线 + 更窄的高效区 + 失速边界
+  离心风机: ψ/ψ_d = a − (a−1)·x^p 幂律（按真实系列选用表最小二乘标定）
+  轴流风机: 驼峰形压力曲线 + 失速鞍形跌落 + 窄高效区
+
+标定状态（2026-09，详见下方系数表注释与 tests/test_perf_calibration.py）：
+  离心 — 后弯/前弯/径向已按 T4-72、9-19、9-26 选用表标定（残差≤5%）
+  轴流 — 文献驼峰模型（未经实测标定）
 
 输出:
   - PerfCurve 对象（数据点 + 摘要 + 变转速换算 at_speed()）
@@ -85,7 +89,7 @@ class PerfCurve:
         ]
         for p in self.points:
             x = p.Q / self.Q_d if self.Q_d > 0 else 0
-            if x < 0.71:
+            if self.Q_stall > 0 and x < self.Q_stall / self.Q_d:
                 state = "失速区"
             elif abs(x - 1.0) < 0.03:
                 state = "★设计"
@@ -255,56 +259,99 @@ class PerfCurve:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 曲线形状（无量纲归一化）
+# 曲线形状（无量纲归一化）— 2026-09 按真实系列选用表标定
 # ═══════════════════════════════════════════════════════════════
+#
+# 标定基准（x = Q/Q_d，Q_d = 系列表中 η_max 工况）：
+#   后弯/机翼   T4-72 No.4A/4.5A/5A @2900 r/min，8 点，x∈[0.66, 1.26]
+#   前弯        9-19  No.4A/4.5A    @2900 r/min，7 点，x∈[0.65, 1.35]
+#   径向(斜前)  9-26  No.4A         @2900 r/min，7 点，x∈[0.73, 1.27]
+#   轴流        T35-11 型谱 + 文献驼峰形（未经实测标定）
+#
+# 压力曲线: ψ/ψ_d = a − (a−1)·x^p （最小二乘拟合，全表点等权）
+# 效率曲线: η/η_d = 1 − k·(1−x)²  （失速侧 k_lo / 超载侧 k_hi）
+# 拟合残差: T4-72 |Δψ|≤0.8%、|Δη|≤0.7%；9-26 |Δψ|≤0.6%；
+#           9-19 |Δψ|≤4.7%（首点，驼峰形致单调模型偏差）、|Δη|≤0.7%
+# 验证: tests/test_perf_calibration.py
+
+_PSI_COEFFS = {
+    # blade_type.value: (a, p)
+    "backward":   (1.19, 4.0),   # T4-72 实测拟合
+    "airfoil":    (1.19, 4.0),   # 同后弯（G4-73 类）
+    "radial":     (1.16, 3.0),   # 9-26 实测拟合
+    "radial_tip": (1.16, 3.0),
+    "forward":    (1.06, 3.0),   # 9-19 实测拟合（前弯曲线平缓是其特征）
+}
+
+_ETA_COEFFS = {
+    # blade_type.value: (k_lo, k_hi)
+    "backward":   (0.90, 1.50),  # T4-72: 失速侧平缓，超载侧较陡
+    "airfoil":    (0.90, 1.50),
+    "radial":     (0.78, 1.05),  # 9-26 无公开效率表，前后弯插值估计
+    "radial_tip": (0.78, 1.05),
+    "forward":    (0.65, 0.70),  # 9-19: 表内 η 全程平坦（±8%）
+}
+
+_X_STALL = {
+    # 失速边界 ≈ 系列表流量下限（表内不存在更小流量即失速区）
+    "backward":   0.60,   # T4-72 表下限 0.66
+    "airfoil":    0.60,
+    "radial":     0.72,   # 9-26 表下限 0.73
+    "radial_tip": 0.72,
+    "forward":    0.62,   # 9-19 表下限 0.65
+}
+
+AXIAL_STALL_X = 0.66   # 轴流失速边界 x_s = Q_stall/Q_d（T35 型谱及文献）
+
+
+def _blade_key(blade_type) -> str:
+    if isinstance(blade_type, BladeType):
+        return blade_type.value
+    return str(blade_type)
 
 
 def _psi_shape_centrifugal(blade_type: BladeType, x: float) -> float:
     """
-    离心风机无量纲压力曲线 ψ/ψ_d = f(φ/φ_d)
+    离心风机无量纲压力曲线 ψ/ψ_d = a − (a−1)·x^p
 
-    归一化锚点（Eck 及 4-72/9-19 实测曲线拟合）：
-      x=0（关死点）: 后向 1.40 / 径向 1.25 / 前向 1.50
-      x=1（设计点）: 1.00
-      抛物线近似 ψ/ψ_d = a − (a−1)·x²
+    系数按 T4-72（后弯）/ 9-19（前弯）/ 9-26（径向）选用表最小二乘标定。
+    前弯曲线明显平缓于后弯 —— 这是前向叶轮的固有特征。
     """
-    if blade_type in (BladeType.BACKWARD, BladeType.AIRFOIL):
-        a = 1.40
-    elif blade_type in (BladeType.RADIAL, BladeType.RADIAL_TIP):
-        a = 1.25
-    else:  # FORWARD
-        a = 1.50
-    return a - (a - 1.0) * x * x
+    a, p = _PSI_COEFFS.get(_blade_key(blade_type), (1.19, 4.0))
+    return a - (a - 1.0) * x ** p
 
 
 def _psi_shape_axial(x: float) -> float:
     """
-    轴流风机无量纲压力曲线（比离心陡，失速后跌落）
+    轴流风机无量纲压力曲线 — 驼峰形 + 失速鞍形（文献模型，未标定）
 
-    x=0: 1.30, x=1: 1.00, 抛物线近似
+      x ≥ x_s（稳定段）: x≤1 时 ψ_r = 1+0.354(1−x²)，失速边界处峰值≈1.20；
+                        x>1 时陡降（轴流右侧曲线显著陡于离心）
+      x < x_s（失速后）: 跌落至鞍底≈0.86 后向关死点≈1.12 缓升（马鞍形）
     """
-    return 1.30 - 0.30 * x * x
+    x_s = AXIAL_STALL_X
+    if x < x_s:
+        return 0.86 + 0.26 * (1.0 - x / x_s) ** 2
+    if x <= 1.0:
+        return 1.0 + 0.354 * (1.0 - x * x)
+    dx = x - 1.0
+    return 1.0 - 0.80 * dx - 1.50 * dx * dx
 
 
 def _eta_ratio(machine: str, blade_type, x: float) -> float:
     """
-    无量纲效率曲线 η/η_d = f(φ/φ_d)
+    无量纲效率曲线 η/η_d = f(x)
 
-    设计点为峰值；失速侧（x<1）比超载侧下降更快。
-    系数按真实风机曲线族校准（2026-08 复核）：
-      后向（4-72 类）: 宽高效区，0.5·Q_d 处 η ≈ 80% 峰值
-      径向（9-26 类）: 中等
-      前向（9-19 类）: 窄高效区，超载侧急剧下降
-      轴流: 最窄，失速边界附近急剧下降
+    设计点为峰值。离心按系列表标定；轴流为文献模型（窄高效区），
+    失速后效率坍缩（最低至 0.25·η_d）。
     """
     if machine == "axial":
-        k_lo, k_hi = 1.8, 2.0
-    elif blade_type == BladeType.FORWARD:
-        k_lo, k_hi = 1.5, 3.0
-    elif blade_type in (BladeType.RADIAL, BladeType.RADIAL_TIP):
-        k_lo, k_hi = 1.0, 1.8
-    else:  # BACKWARD / AIRFOIL
-        k_lo, k_hi = 0.8, 1.0
+        x_s = AXIAL_STALL_X
+        if x < x_s:
+            return max(0.25, 1.0 - 3.5 * (x_s - x))
+        k_lo, k_hi = 2.0, 2.4
+    else:
+        k_lo, k_hi = _ETA_COEFFS.get(_blade_key(blade_type), (0.9, 1.5))
     if x < 1.0:
         r = 1.0 - k_lo * (1.0 - x) ** 2
     else:
@@ -328,7 +375,7 @@ def centrifugal_perf_curve(
     Q_d, P_d, eta_d = inp.Q, inp.P, design.eta
     N_d = Q_d / 3600.0 * P_d / (1000.0 * eta_d)
 
-    x_stall = 0.55 if design.blade_type in (BladeType.BACKWARD, BladeType.AIRFOIL) else 0.35
+    x_stall = _X_STALL.get(design.blade_type.value, 0.60)
 
     pts = []
     for i in range(n_points):
@@ -369,7 +416,7 @@ def axial_perf_curve(
 
     return PerfCurve(
         machine="axial", n=n, Q_d=Q_d, P_d=P_d, eta_d=eta_d,
-        N_d=N_d, points=pts, Q_stall=Q_d * 0.78,
+        N_d=N_d, points=pts, Q_stall=Q_d * AXIAL_STALL_X,
     )
 
 

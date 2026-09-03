@@ -1,14 +1,22 @@
 """
 SolidWorks 参数化法兰盘生成器
 
-通过 SolidWorks COM API (OLE Automation) 自动创建法兰盘 3D 模型。
+支持四种法兰类型（GB/T 911X-2010，颈部数据源 HG/T 20592-2009）：
+  - plate     板式平焊（GB/T 9119）
+  - slip_on   带颈平焊（GB/T 9116）— 直颈
+  - weld_neck 对焊（GB/T 9115）— 锥颈 + 焊端直段 H1
+  - blind     法兰盖（GB/T 9123）— 无内孔
+
+建模策略（已在 SolidWorks 2022 实测验证）：
+  1. 前视基准面绘制半剖面封闭轮廓（X=半径，Y=轴向，原点在密封面顶端）
+  2. 轮廓 + 轴心线 → 360° 旋转凸台（含 RF 密封面、法兰盘、颈部）
+  3. 密封面顶选面 → 螺栓孔草图（n 个圆均布于 PCD）→ 切除（ThroughAll/ThroughNext）
 
 依赖: pywin32 (Windows only, SolidWorks 需安装)
 运行环境: Windows + SolidWorks 2022+
 """
 
 import os
-import time
 from typing import Optional
 from dataclasses import dataclass
 
@@ -21,6 +29,76 @@ try:
     HAS_PYWIN32 = True
 except ImportError:
     HAS_PYWIN32 = False
+
+
+# ═══════════════════════════════════════════════════════════════
+# 几何：半剖面轮廓（mm）
+# ═══════════════════════════════════════════════════════════════
+
+
+def _flange_profile(params: FlangeParams) -> list[tuple[float, float]]:
+    """
+    生成旋转半剖面轮廓点（mm）。
+
+    坐标系：X=半径（≥0），Y=轴向（密封面顶端 y=0，向法兰背面为负）。
+    旋转轴为 X=0 的轴心线。点序沿轮廓闭合。
+
+    Raises:
+        ValueError: 参数不完整或几何矛盾
+    """
+    t = params.flange_type
+    rb = params.inner_d / 2.0                    # 内孔半径（BL 为 0）
+    r1 = (params.d1 or params.d * 0.85) / 2.0    # 密封面半径
+    R = params.d / 2.0                           # 法兰外圆半径
+    f = params.f
+    C = params.c
+    yB = -f                # 密封面凸台底（= 法兰盘正面）
+    yD = -(f + C)          # 法兰背面
+
+    if R <= r1 or r1 <= 0 or R <= 0:
+        raise ValueError(f"几何矛盾: 外径 D={params.d} / 密封面 d1={params.d1}")
+
+    if t in (FlangeType.SLIP_ON, FlangeType.WELD_NECK):
+        if params.neck_d <= 0 or params.neck_h <= 0:
+            raise ValueError(
+                f"{t.value} 法兰缺少颈部参数（neck_d/neck_h），请使用国标 DN×PN 规格"
+            )
+        nr = params.neck_d / 2.0
+        yT = yD - params.neck_h
+        if t == FlangeType.SLIP_ON:
+            pts = [
+                (rb, 0.0), (r1, 0.0), (r1, yB), (R, yB),
+                (R, yD), (nr, yD), (nr, yT), (rb, yT),
+            ]
+        else:
+            a1 = (params.neck_tip_d or params.inner_d + 2 * params.neck_thk) / 2.0
+            h1 = min(params.neck_straight_h, params.neck_h)
+            yS = yT + h1  # 焊端直段上端
+            if not (rb < a1 <= nr < r1):
+                raise ValueError(
+                    f"对焊法兰颈部几何矛盾: 内径={params.inner_d} "
+                    f"小端={a1 * 2:.1f} 根径={params.neck_d} 密封面={params.d1}"
+                )
+            pts = [
+                (rb, 0.0), (r1, 0.0), (r1, yB), (R, yB),
+                (R, yD), (nr, yD), (a1, yS), (a1, yT), (rb, yT),
+            ]
+    elif t == FlangeType.BLIND:
+        pts = [(0.0, 0.0), (r1, 0.0), (r1, yB), (R, yB), (R, yD), (0.0, yD)]
+    else:  # plate
+        if not (0 < rb < r1):
+            raise ValueError(f"板式法兰几何矛盾: 内径={params.inner_d} 密封面={params.d1}")
+        pts = [(rb, 0.0), (r1, 0.0), (r1, yB), (R, yB), (R, yD), (rb, yD)]
+
+    return pts
+
+
+def _bolt_hole_geometry(params: FlangeParams) -> tuple[float, float, int, float]:
+    """螺栓孔几何: (选面参考半径 rPick, PCD 半径, 孔数, 孔半径)"""
+    rb = params.inner_d / 2.0
+    r1 = (params.d1 or params.d * 0.85) / 2.0
+    r_pick = (rb + r1) / 2.0  # 密封面顶环形区域中点（BL 为圆心到密封面中点）
+    return r_pick, params.k / 2.0, params.n, params.l / 2.0
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -96,38 +174,17 @@ def close_sw(session: SldWorksSession, save: bool = False, path: Optional[str] =
 
 
 # ═══════════════════════════════════════════════════════════════
-# 特征创建 ── 法兰盘建模步骤
+# 特征创建 ── 法兰盘建模步骤（4 类通用）
 # ═══════════════════════════════════════════════════════════════
 
 
-def _ensure_sketch_edit(part, plan_ref: str = "前视基准面"):
-    """进入草图编辑状态"""
-    # 选择基准面
-    selection = part.Extension.SelectByID2(
-        plan_ref, "PLANE", 0, 0, 0, False, 0, None, 0
-    )
-    # 插入草图
-    part.SketchManager.InsertSketch(True)
-
-
-def _add_dimension(part, name: str, value: float):
-    """添加标注并设置尺寸"""
-    part.AddDimension2(0, 0, 0)
-    # 获取最后添加的标注并设值
-    params = part.Parameter(name)
-    if params:
-        params.SystemValue = value / 1000.0  # SW 使用米为单位
-
-
-def create_plate_flange(part, params: FlangeParams) -> bool:
+def create_flange_solid(part, params: FlangeParams) -> bool:
     """
-    创建板式平焊法兰
+    创建法兰实体（plate / slip_on / weld_neck / blind 通用）
 
-    建模流程:
-    1. 前视基准面 → 草图（法兰外圆 + 内孔）
-    2. 拉伸凸台（法兰主体）
-    3. 密封面凸台（RF 面）
-    4. 螺栓孔（圆周阵列）
+    步骤:
+      1. 半剖面轮廓 + 轴心线 → 旋转凸台（法兰主体 + RF 密封面 + 颈部）
+      2. 密封面顶选面 → n 个螺栓孔草图（均布 PCD）→ 切除
 
     Args:
         part: SolidWorks Part 对象
@@ -136,103 +193,75 @@ def create_plate_flange(part, params: FlangeParams) -> bool:
     Returns:
         True 表示成功
     """
+    pts = _flange_profile(params)
+    r_pick, k_r, n_bolts, bolt_r = _bolt_hole_geometry(params)
+
+    m = 1000.0  # mm → m
+    sk = part.SketchManager
+    fm = part.FeatureManager
+
     try:
-        d_outer = params.d / 1000.0   # 转米
-        d_inner = (params.inner_d or params.d * 0.6) / 1000.0
-        thickness = params.c / 1000.0
-        seal_h = params.f / 1000.0
-        seal_d = (params.d1 or d_outer * 0.85) / 1000.0
-        bolt_pcd = params.k / 1000.0
-        bolt_dia = params.l / 1000.0
-        bolt_count = params.n
-
-        # ═══ Step 1: 法兰主体（外圆内孔的圆环） ═══
-        part.SketchManager.InsertSketch(True)
-
-        # 外圆
-        circle_outer = part.SketchManager.CreateCircle(0, 0, 0, d_outer / 2, 0, 0)
-        # 内孔
-        circle_inner = part.SketchManager.CreateCircle(0, 0, 0, d_inner / 2, 0, 0)
-
-        part.SketchManager.InsertSketch(True)
+        # ═══ Step 1: 旋转主体（实测配方：轴心线对象引用 + mark=1 + 8 参数 FeatureRevolve） ═══
+        sk.InsertSketch(True)
+        for i in range(len(pts)):
+            x1, y1 = pts[i]
+            x2, y2 = pts[(i + 1) % len(pts)]
+            part.CreateLine2(x1 / m, y1 / m, 0.0, x2 / m, y2 / m, 0.0)
+        y_min = min(p[1] for p in pts)
+        seg_axis = part.CreateLine2(0.0, 0.02, 0.0, 0.0, (y_min - 20.0) / m, 0.0)
+        seg_axis.ConstructionGeometry = True
+        sk.InsertSketch(True)
         part.ClearSelection2(True)
+        seg_axis.Select2(True, 1)
 
-        # 拉伸凸台
-        feature_mgr = part.FeatureManager
-        feat_extrude = feature_mgr.FeatureExtrusion2(
-            True,           # IsReverseDirection
-            True,           # IsDefaultThickness
-            False,          # IsDraft
-            0,              # DraftAngle
-            0,              # StartCondition (0=SketchPlane)
-            1,              # EndCondition (1=Blind)
-            thickness,       # Depth
-            0,              # FlipSideToCut
-            0,              # ReverseOffsetDir
-            0,              # FlipInsideOut
-            0,              # TranslateSurface
-            0,              # MergeAuto
-            False,          # UseFeatScope
-            0,              # FeatScopeType
-            0.0,            # WallThickness (thin feature)
-            0.0,            # Gap
-            0,              # Auto fillet edges
-            0.0,            # Fillet radius
-            0,              # check direction
-            False,          # merge solids
+        feat_revolve = fm.FeatureRevolve(
+            6.2831853071796, False, 0, 0, 0, True, True, True
         )
+        if feat_revolve is None:
+            print("[SW Generator] 旋转特征创建失败")
+            return False
 
-        # ═══ Step 2: 密封面凸台（RF 面） ═══
-        if seal_h > 0.001:
-            # 在法兰顶面画密封面圆
-            part.SketchManager.InsertSketch(True)
-
-            seal_circle = part.SketchManager.CreateCircle(
-                0, 0, 0, seal_d / 2, 0, 0
-            )
-            part.SketchManager.InsertSketch(True)
+        # ═══ Step 2: 螺栓孔（上视基准面草图 → 26 参数 FeatureCut3 ThroughAll，实测配方） ═══
+        if n_bolts > 0 and bolt_r > 0:
             part.ClearSelection2(True)
+            plane2 = _find_second_ref_plane(part)
+            if plane2 is None or not plane2.Select2(False, 0):
+                print("[SW Generator] 螺栓孔草图基准面选择失败")
+                return False
 
-            feat_seal = feature_mgr.FeatureExtrusion2(
-                True, False, False, 0, 0, 1, seal_h,
-                0, 0, 0, 0, True, 0, 0.0, 0.0, 0, False, False,
-            )
+            sk.InsertSketch(True)
+            import math
+            for i in range(n_bolts):
+                th = 2.0 * math.pi * i / n_bolts
+                cx = k_r / m * math.cos(th)
+                cy = k_r / m * math.sin(th)
+                sk.CreateCircle(cx, cy, 0.0, cx + bolt_r / m, cy, 0.0)
+            sk.InsertSketch(True)
 
-        # ═══ Step 3: 螺栓孔 ═══
-        # 创建一个螺栓孔
-        if bolt_count > 0:
-            part.SketchManager.InsertSketch(True)
-
-            bolt_hole = part.SketchManager.CreateCircle(
-                0, 0, 0, bolt_dia / 2, 0, 0
-            )
-            # 添加约束将孔定位到 PCD 上
-            part.AddDimension2(bolt_pcd, 0, 0)
-
-            part.SketchManager.InsertSketch(True)
-            part.ClearSelection2(True)
-
-            # 切除拉伸（通孔）— 深度按法兰总厚（主体 + 密封面）加余量，保证切穿
-            cut_depth = (thickness + seal_h) * 1.2 + 0.002
-            feat_cut = feature_mgr.FeatureCut(
-                False, False, False, 0, 0, 1, cut_depth,
-                0, False, False, False, False, 0, 0, False, False,
-            )
-
-            # 圆周阵列
-            if bolt_count > 1:
-                circle_pattern = feature_mgr.FeatureCircularPattern(
-                    bolt_count,      # InstanceCount
-                    360.0,           # TotalAngle (degrees)
-                    False,           # EqualSpacing
-                    False,           # ReverseDirection
-                    False,           # KeepMark
-                    f"{feat_cut.Name if feat_cut else 'Cut-Extrude1'}"
+            cut = None
+            try:
+                cut = fm.FeatureCut3(
+                    True, False, False, 1, 1, 0, 0, False, False, False, False,
+                    0, 0, False, False, False, False, False, True, True, True, True,
+                    False, 0, 0, False,
                 )
+            except Exception:
+                cut = None
+            if cut is None:
+                try:
+                    cut = fm.FeatureCut3(
+                        True, False, False, 0, 0, 0.06, 0.06, False, False,
+                        False, False, 0, 0, False, False, False, False, False,
+                        True, True, True, True, False, 0, 0, False,
+                    )
+                except Exception:
+                    cut = None
+            if cut is None:
+                print("[SW Generator] 螺栓孔切除失败")
+                return False
 
         part.ClearSelection2(True)
         part.ViewZoomtofit2()
-
         return True
 
     except Exception as e:
@@ -240,9 +269,22 @@ def create_plate_flange(part, params: FlangeParams) -> bool:
         return False
 
 
+def _find_second_ref_plane(part):
+    """遍历特征树返回第 2 个基准面（上视基准面，法向 = 法兰轴向）"""
+    feat = part.FirstFeature
+    idx = 0
+    while feat is not None:
+        if feat.GetTypeName2() == "RefPlane":
+            idx += 1
+            if idx == 2:
+                return feat
+        feat = feat.GetNextFeature()
+    return None
+
+
 def generate_flange(params: FlangeParams, output_path: Optional[str] = None) -> str:
     """
-    生成法兰盘模型
+    生成法兰盘模型（pywin32 COM 直连 SolidWorks）
 
     Args:
         params: 法兰参数
@@ -254,10 +296,8 @@ def generate_flange(params: FlangeParams, output_path: Optional[str] = None) -> 
     session = connect_sw(visible=True)
 
     try:
-        if params.flange_type == FlangeType.PLATE:
-            create_plate_flange(session.part, params)
-        else:
-            raise NotImplementedError(f"暂不支持 {params.flange_type} 类型")
+        if not create_flange_solid(session.part, params):
+            raise RuntimeError("法兰建模失败，详见控制台输出")
 
         # 自动命名
         if not output_path:
@@ -277,89 +317,139 @@ def generate_flange(params: FlangeParams, output_path: Optional[str] = None) -> 
 
 
 # ═══════════════════════════════════════════════════════════════
-# 离线预览（无 SW 环境时生成代码而非模型）
+# VBA 宏生成（跨平台 / 生产主路径：C# 插件 RunMacro 执行）
 # ═══════════════════════════════════════════════════════════════
 
 
 def generate_sw_macro(params: FlangeParams) -> str:
     """
-    生成 SolidWorks VBA 宏代码（无 pywin32 时的替代方案）
+    生成 SolidWorks VBA 宏代码（4 类法兰通用）
 
     可以直接在 SolidWorks 中运行（工具 → 宏 → 运行）
 
     Returns:
         VBA 宏代码字符串
     """
-    d = params.d
-    inner_d = params.inner_d or params.d * 0.55
-    c = params.c
-    f = params.f
-    d1_val = params.d1 or d * 0.8
-    k = params.k
-    l = params.l
-    n = params.n
-    dn = params.dn
-    pn = params.pn
+    import math
 
-    # 预计算 VBA 表达式（避免 f-string 中 ! 被 Python 解释为格式转换）
-    r_outer = f"{d / 2000}!"
-    r_inner = f"{inner_d / 2000}!"
-    depth_c = f"{c / 1000}!"
-    r_seal = f"{d1_val / 2000}!"
-    depth_f = f"{f / 1000}!"
-    pcd_k = f"{k / 2000}!"
-    r_bolt = f"{l / 2000}!"
-    # 螺栓孔切穿深度：法兰总厚（主体 c + 密封面 f）加余量，不再硬编码
-    depth_cut = f"{(c + f) * 1.2 / 1000 + 0.002}!"
+    pts = _flange_profile(params)
+    r_pick, k_r, n_bolts, bolt_r = _bolt_hole_geometry(params)
 
-    macro = f"""' SolidWorks 宏 — 参数化法兰盘 DN{dn} PN{pn}
-' 自动生成 by solidworks-parametric v0.1.0
+    t = params.flange_type
+    type_names = {
+        FlangeType.PLATE: "板式平焊",
+        FlangeType.SLIP_ON: "带颈平焊",
+        FlangeType.WELD_NECK: "对焊",
+        FlangeType.BLIND: "法兰盖",
+    }
+
+    m = 1000.0
+
+    def d(v: float) -> str:
+        """mm → m 的 VBA Double 字面量"""
+        return f"{v / m:.6f}#"
+
+    # 轮廓线段（含闭合边）
+    y_min = min(p[1] for p in pts)
+    lines = []
+    for i in range(len(pts)):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % len(pts)]
+        lines.append(
+            f"    Part.CreateLine2 {d(x1)}, {d(y1)}, 0#, {d(x2)}, {d(y2)}, 0#"
+        )
+
+    # 螺栓孔圆（VB 数组预计算，避免循环内三角函数的精度差异）
+    bolt_lines = []
+    for i in range(n_bolts):
+        th = 2.0 * math.pi * i / n_bolts
+        cx = k_r * math.cos(th)
+        cy = k_r * math.sin(th)
+        bolt_lines.append(
+            f"        skMgr.CreateCircle {d(cx)}, {d(cy)}, 0#, {d(cx + bolt_r)}, {d(cy)}, 0#"
+        )
+
+    neck_comment = ""
+    if t == FlangeType.WELD_NECK:
+        neck_comment = (
+            f"    ' 颈部: 根径 N={params.neck_d} → 小端 A1={params.neck_tip_d}，"
+            f"锥颈+直段 H1={params.neck_straight_h}，总长 {params.neck_h}\n"
+        )
+    elif t == FlangeType.SLIP_ON:
+        neck_comment = f"    ' 颈部: 直颈 N={params.neck_d}，长 {params.neck_h}\n"
+
+    macro = f"""' SolidWorks 宏 — 参数化法兰 DN{params.dn} PN{params.pn} {type_names.get(t, t.value)}
+' 标准 {params.standard} | 自动生成 by sw-ai
 ' 在 SW 中: 工具 → 宏 → 运行
 
 Dim swApp As Object
 Dim Part As Object
-Dim boolStatus As Boolean
+Dim skMgr As Object
+Dim featMgr As Object
 
 Sub main()
     Set swApp = Application.SldWorks
     Set Part = swApp.NewDocument("", 0, 0, 0)
     swApp.Visible = True
+    Set skMgr = Part.SketchManager
+    Set featMgr = Part.FeatureManager
 
-    ' === 法兰主体 ===
-    Dim skSegment As Object
-    
-    Part.SketchManager.InsertSketch True
-    ' 外圆 {d}mm
-    Set skSegment = Part.SketchManager.CreateCircle(0#, 0#, 0#, {r_outer}, 0#, 0#)
-    ' 内孔 {inner_d}mm
-    Set skSegment = Part.SketchManager.CreateCircle(0#, 0#, 0#, {r_inner}, 0#, 0#)
-    Part.SketchManager.InsertSketch True
+    ' === 1. 半剖面轮廓 + 轴心线 → 旋转成型 ===
+    ' X=半径 Y=轴向（密封面顶 y=0），法兰总高 {f'{-y_min:.1f}'}mm
+{neck_comment}    skMgr.InsertSketch True
+{chr(10).join(lines)}
+    ' 轴心线（X=0，超出轮廓两端）— 对象引用 + mark=1 选择 + 8 参数 FeatureRevolve（实测配方）
+    Dim segAxis As Object
+    Set segAxis = Part.CreateLine2(0#, 0.02#, 0#, 0#, {d(y_min - 20.0)}, 0#)
+    segAxis.ConstructionGeometry = True
+    skMgr.InsertSketch True
     Part.ClearSelection2 True
+    segAxis.Select2 True, 1
+    Dim revFeat As Object
+    Set revFeat = featMgr.FeatureRevolve(6.2831853071796, False, 0, 0, 0, True, True, True)
+    If revFeat Is Nothing Then
+        MsgBox "旋转特征创建失败", vbCritical, "sw-ai"
+        Exit Sub
+    End If
 
-    ' 拉伸 {c}mm
-    Dim myFeature As Object
-    Set myFeature = Part.FeatureManager.FeatureExtrusion2(True, True, False, 0#, 0, 1, {depth_c}, 0, 0, 0, 0, True, 0, 0#, 0#, 0, False, False)
+    ' === 2. 螺栓孔 {n_bolts}×ø{params.l} PCD={params.k} ===
+    ' 上视基准面（特征树第 2 个基准面）画孔圆 → ThroughAll 切除（实测配方）
+    Dim feat0 As Object
+    Dim idx As Integer
+    Set feat0 = Part.FirstFeature
+    idx = 0
+    Do While Not feat0 Is Nothing
+        If feat0.GetTypeName2 = "RefPlane" Then
+            idx = idx + 1
+            If idx = 2 Then Exit Do
+        End If
+        Set feat0 = feat0.GetNextFeature
+    Loop
+    If feat0 Is Nothing Then
+        MsgBox "未找到上视基准面", vbCritical, "sw-ai"
+        Exit Sub
+    End If
+    feat0.Select2 False, 0
+    skMgr.InsertSketch True
+{chr(10).join(bolt_lines)}
+    skMgr.InsertSketch True
 
-    ' === 密封面 (RF) 凸台 {f}mm ===
-    Part.SketchManager.InsertSketch True
-    Set skSegment = Part.SketchManager.CreateCircle(0#, 0#, 0#, {r_seal}, 0#, 0#)
-    Part.SketchManager.InsertSketch True
-    Part.ClearSelection2 True
-    Set myFeature = Part.FeatureManager.FeatureExtrusion2(True, True, False, 0#, 0, 1, {depth_f}, 0, 0, 0, 0, True, 0, 0#, 0#, 0, False, False)
+    Dim cutFeat As Object
+    Set cutFeat = Nothing
+    On Error Resume Next
+    Set cutFeat = featMgr.FeatureCut3(True, False, False, 1, 1, 0#, 0#, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
+    If cutFeat Is Nothing Then
+        Err.Clear
+        Set cutFeat = featMgr.FeatureCut3(True, False, False, 0, 0, 0.06#, 0.06#, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
+    End If
+    On Error Goto 0
 
-    ' === 螺栓孔 {n}x\u00f8{l} PCD={k} ===
-    Part.SketchManager.InsertSketch True
-    Set skSegment = Part.SketchManager.CreateCircle({pcd_k}, 0#, 0#, {r_bolt}, 0#, 0#)
-    Part.SketchManager.InsertSketch True
-    Part.ClearSelection2 True
-    Set myFeature = Part.FeatureManager.FeatureCut(False, False, False, 0#, 0, 1, {depth_cut}, 0, False, False, False, False, 0, 0, False, False)
-    
-    ' 圆周阵列
-    Part.ClearSelection2 True
-    Set myFeature = Part.FeatureManager.FeatureCircularPattern({n}, 360#, False, False, False, "Cut-Extrude1")
-
-    Part.ViewZoomtofit2
-    MsgBox "法兰盘 DN{dn} PN{pn} 生成完成", vbInformation, "solidworks-parametric"
+    If cutFeat Is Nothing Then
+        MsgBox "螺栓孔切除失败", vbCritical, "sw-ai"
+    Else
+        Part.ViewZoomtofit2
+        MsgBox "{type_names.get(t, t.value)}法兰 DN{params.dn} PN{params.pn} 生成完成", vbInformation, "sw-ai"
+    End If
 End Sub
 """
     return macro

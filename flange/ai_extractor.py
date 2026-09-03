@@ -145,19 +145,28 @@ def _regex_extract(text: str) -> dict:
     if hole_match:
         result["n"] = int(hole_match.group(1))
 
-    # 法兰类型
+    # 法兰类型（长词优先，避免"带颈平焊"被"平焊"抢先命中）
     type_map = {
+        "带颈对焊": "weld_neck",
+        "对焊": "weld_neck",
+        "带颈平焊": "slip_on",
+        "带颈": "slip_on",
+        "盲板": "blind",
+        "法兰盖": "blind",
         "平焊": "plate",
         "板式": "plate",
-        "带颈": "slip_on",
-        "对焊": "weld_neck",
-        "盲板": "blind",
         "螺纹": "threaded",
     }
     for keyword, ftype in type_map.items():
         if keyword in text:
             result["flange_type"] = ftype
             break
+    else:
+        text_l = text.lower()
+        for kw in ("weld_neck", "weld neck", "slip_on", "slip-on", "blind", "plate"):
+            if kw in text_l:
+                result["flange_type"] = kw.replace("-", "_").replace(" ", "_")
+                break
 
     # 密封面
     seal_map = {
@@ -238,7 +247,7 @@ def extract(text: str) -> ExtractionResult:
     # 查国标
     try:
         if is_supported(dn, pn):
-            params = lookup(dn, pn)
+            params = lookup(dn, pn, raw.get("flange_type", "plate"))
         else:
             # 自定义尺寸 — 不查国标，用 raw 中提取的值
             params = FlangeParams(

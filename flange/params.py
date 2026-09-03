@@ -64,11 +64,12 @@ class FlangeParams:
     # ── 内径 / 接管尺寸 ──
     inner_d: float = 0.0        # 法兰内径（≈接管外径）
     
-    # ── 对焊法兰专属 ──
-    neck_d: float = 0.0         # 颈部小端外径
-    neck_h: float = 0.0         # 颈部高度
-    neck_thk: float = 0.0       # 颈部壁厚
-    hub_len: float = 0.0        # 锥颈长度
+    # ── 带颈法兰专属（SO/WN，GB/T 9116 / GB/T 9115，数据源 HG/T 20592-2009） ──
+    neck_d: float = 0.0         # 颈部根部直径 N（法兰背面处）
+    neck_h: float = 0.0         # 颈部长度（突出法兰背面，= 总高 H - 法兰厚 C - 密封面 f）
+    neck_thk: float = 0.0       # 颈部小端壁厚 S（对焊法兰焊端壁厚）
+    neck_tip_d: float = 0.0    # 颈部小端外径（对焊=钢管外径 A1；带颈平焊=N 直颈）
+    neck_straight_h: float = 0.0  # 对焊法兰焊端直段长度 H1（锥颈之后的等径段）
     
     # ── 材料 ──
     material: str = "Q235B"     # 默认碳钢
