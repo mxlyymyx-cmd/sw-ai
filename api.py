@@ -118,10 +118,10 @@ def list_models():
                 "name": "法兰盘",
                 "description": "板式平焊/带颈平焊/对焊法兰，国标GB/T 911X-2010系列",
                 "params": {
-                    "dn": {"type": "int", "required": True, "description": "公称通径 (DN10~DN2000)"},
+                    "dn": {"type": "int", "required": True, "description": "公称通径 (DN10~DN300)"},
                     "pn": {"type": "int", "required": True, "description": "公称压力 (PN10, PN16, PN25, PN40)"},
-                    "flange_type": {"type": "str", "default": "plate", "choices": ["plate", "slip_on", "weld_neck", "threaded", "blind"]},
-                    "seal_type": {"type": "str", "default": "rf", "choices": ["rf", "ff", "mfm", "tg", "rj"]},
+                    "flange_type": {"type": "str", "default": "plate", "choices": ["plate", "slip_on", "weld_neck", "blind"]},
+                    "seal_type": {"type": "str", "default": "rf", "choices": ["rf", "mfm", "tg"]},
                     "material": {"type": "str", "default": "Q235B"},
                     "n": {"type": "int", "default": 0, "description": "螺栓孔数量（0=自动）"},
                 },

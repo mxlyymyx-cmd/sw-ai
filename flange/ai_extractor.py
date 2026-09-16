@@ -27,7 +27,7 @@ EXTRACT_SYSTEM_PROMPT = """你是一个专业机械设计工程师，擅长从�
 
 ## 可选参数
 - flange_type (str): 法兰类型 - "plate"(板式平焊) / "slip_on"(带颈平焊) / "weld_neck"(对焊) / "blind"(盲板)
-- seal_type (str): 密封面类型 - "rf"(突面) / "ff"(全平面) / "mfm"(凹凸面)
+- seal_type (str): 密封面类型 - "rf"(突面) / "mfm"(凹凸面) / "tg"(榫槽面)
 - material (str): 材料，如 "Q235B", "304", "316L", "20#"
 - n (int): 螺栓孔数量
 - coating (str): 表面处理
@@ -155,7 +155,6 @@ def _regex_extract(text: str) -> dict:
         "法兰盖": "blind",
         "平焊": "plate",
         "板式": "plate",
-        "螺纹": "threaded",
     }
     for keyword, ftype in type_map.items():
         if keyword in text:
@@ -171,10 +170,8 @@ def _regex_extract(text: str) -> dict:
     # 密封面
     seal_map = {
         "突面": "rf",
-        "全平面": "ff",
         "凹凸": "mfm",
         "榫槽": "tg",
-        "环连接": "rj",
     }
     for keyword, stype in seal_map.items():
         if keyword in text:
