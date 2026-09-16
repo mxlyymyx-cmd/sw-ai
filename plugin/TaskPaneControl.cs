@@ -41,6 +41,21 @@ namespace SWAI
             InitializeComponent();
             _apiClient = new ApiClient("http://127.0.0.1:5757");
 
+            // SolidWorks 任务窗格会拦截 Enter 键：标记为输入键确保送达控件，
+            // 另加 KeyPress 兜底（KeyDown 在 SW COM 宿主中可能不触发）
+            txtChatInput.PreviewKeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter) { e.IsInputKey = true; }
+            };
+            txtChatInput.KeyPress += (s, e) =>
+            {
+                if (e.KeyChar == (char)Keys.Enter)
+                {
+                    e.Handled = true;
+                    BtnChatSend_Click(s, e);
+                }
+            };
+
             // 默认选中 AI 对话
             tabControl1.SelectedIndex = 0;
 
@@ -96,13 +111,13 @@ namespace SWAI
                     return;
                 }
 
-                string reply = chatResult.Data?.GetValue("reply")?.ToString() ?? "";
-                string action = chatResult.Data?.GetValue("action")?.ToString() ?? "chat";
-                string macro = chatResult.Data?.GetValue("macro")?.ToString() ?? "";
-                string extraMacro = chatResult.Data?.GetValue("extra_macro")?.ToString() ?? "";
-                string extraName = chatResult.Data?.GetValue("extra_name")?.ToString() ?? "";
+                string reply = chatResult.GetValue("reply")?.ToString() ?? "";
+                string action = chatResult.GetValue("action")?.ToString() ?? "chat";
+                string macro = chatResult.GetValue("macro")?.ToString() ?? "";
+                string extraMacro = chatResult.GetValue("extra_macro")?.ToString() ?? "";
+                string extraName = chatResult.GetValue("extra_name")?.ToString() ?? "";
                 bool llmUsed = false;
-                try { llmUsed = Convert.ToBoolean(chatResult.Data?.GetValue("llm")); } catch { }
+                try { llmUsed = Convert.ToBoolean(chatResult.GetValue("llm")); } catch { }
 
                 // 显示 AI 回复
                 AppendChat($"🤖 {reply}", llmUsed ? Color.FromArgb(144, 238, 144) : Color.LightGray);
@@ -183,8 +198,8 @@ namespace SWAI
                     var cfg = await _apiClient.GetChatConfigAsync();
                     if (cfg.IsSuccess)
                     {
-                        dlg.ApiUrl = cfg.Data?.GetValue("api_url")?.ToString() ?? "";
-                        dlg.Model = cfg.Data?.GetValue("model")?.ToString() ?? "";
+                        dlg.ApiUrl = cfg.GetValue("api_url")?.ToString() ?? "";
+                        dlg.Model = cfg.GetValue("model")?.ToString() ?? "";
                     }
                 }
                 catch { }
@@ -304,7 +319,7 @@ namespace SWAI
                     return;
                 }
 
-                string summary = designResult.Data?.GetValue("summary")?.ToString() ?? "";
+                string summary = designResult.GetValue("summary")?.ToString() ?? "";
                 if (!string.IsNullOrEmpty(summary))
                 {
                     AppendLog($"📐 设计结果:\n{summary}", Color.Black);
@@ -315,9 +330,10 @@ namespace SWAI
                 var macroResult = await _apiClient.GenerateMacroAsync(partType, designParams);
                 if (macroResult.IsSuccess)
                 {
-                    string macroName = macroResult.Data?.GetValue("name")?.ToString() ?? "Unknown";
-                    int? lines = (int?)macroResult.Data?.GetValue("lines");
-                    AppendLog($"✅ VBA 宏生成: {macroName} ({lines ?? 0} 行)", Color.Green);
+                    string macroName = macroResult.GetValue("name")?.ToString() ?? "Unknown";
+                    int lines = 0;
+                    try { lines = Convert.ToInt32(macroResult.GetValue("lines")); } catch { }
+                    AppendLog($"✅ VBA 宏生成: {macroName} ({lines} 行)", Color.Green);
                 }
                 else
                 {
@@ -406,7 +422,7 @@ namespace SWAI
                 var healthResult = await _apiClient.HealthCheckAsync();
                 if (healthResult.IsSuccess)
                 {
-                    string version = healthResult.Data?.GetValue("version")?.ToString() ?? "?";
+                    string version = healthResult.GetValue("version")?.ToString() ?? "?";
                     AppendLog($"✅ 后端连接成功 (v{version})", Color.Green);
                 }
                 else

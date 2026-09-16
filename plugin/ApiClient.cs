@@ -32,6 +32,20 @@ namespace SWAI
         {
             return new ApiResult { IsSuccess = false, Error = error, StatusCode = statusCode };
         }
+
+        /// <summary>
+        /// 从 Data 字典取值。Data 运行时是 Dictionary&lt;string,object&gt;（JavaScriptSerializer 产物），
+        /// 没有 GetValue 方法 — 必须在此提供，TaskPaneControl 均通过本方法取键值。
+        /// </summary>
+        public object GetValue(string key)
+        {
+            if (Data is System.Collections.Generic.Dictionary<string, object> dict
+                && dict.TryGetValue(key, out object v))
+            {
+                return v;
+            }
+            return null;
+        }
     }
 
     /// <summary>

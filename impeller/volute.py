@@ -238,40 +238,59 @@ def match_impeller(design_result) -> VoluteParams:
 
 def generate_vba_macro(v: VoluteParams, full_profile: list[dict]) -> str:
     """
-    生成蜗壳 VBA 宏
+    生成蜗壳 VBA 宏（SW-2022 VBS/cscript 通道实测配方）
 
     建模步骤：
-    1. 在顶视基准面画蜗壳外壁型线（样条曲线）
-    2. 拉伸 B 宽度 → 蜗壳体
-    3. 切出叶轮内腔
-    4. 切出进口孔
+    1. 首草图（默认前视基准面）：蜗壳螺旋外壁折线（单封闭回路）
+       —— VBS 中 CreateSpline 返回 Nothing，必须用 CreateLine2 折线逼近
+    2. FeatureExtrusion3 23 参数、MidPlane、深度 B —— 20 参数版本报 449
+    3. 前视基准面（特征树第 1 个基准面）画叶轮内腔圆 → FeatureCut3 贯穿切除
+       —— 螺旋起点与内腔圆必须留间隙（相切会切除失败）
     """
     R2 = v.R2
 
-    # 型线点转 VBA 数组
-    n = len(full_profile)
+    # 蜗舌间隙：螺旋起点外移，避免与内腔圆相切（实测相切时切除返回 Nothing）
+    gap = max(2.0, 0.006 * R2)
 
-    def m(val):
-        return f"{val / 1000.0:.6f}"
+    # 型线点外移 gap 后转折线（米）
+    pts = []
+    for pt in full_profile:
+        r = math.hypot(pt["x"], pt["y"])
+        if r > 1e-9:
+            s = (r + gap) / r
+            pts.append((pt["x"] * s / 1000.0, pt["y"] * s / 1000.0))
+        else:
+            pts.append((0.0, 0.0))
 
-    # 生成外壁样条点
-    spline_pts = []
-    for idx, pt in enumerate(full_profile):
-        spline_pts.append(
-            f"  sp({idx * 2}) = {m(pt['x'])}: sp({idx * 2 + 1}) = {m(pt['y'])}"
+    spiral_lines = []
+    for i in range(len(pts) - 1):
+        x1, y1 = pts[i]
+        x2, y2 = pts[i + 1]
+        spiral_lines.append(
+            f"    Part.CreateLine2 {x1:.6f}, {y1:.6f}, 0, {x2:.6f}, {y2:.6f}, 0"
         )
-    spline_block = "\n".join(spline_pts)
+    # 闭合径向线（终点 → 起点）
+    x1, y1 = pts[-1]
+    x2, y2 = pts[0]
+    spiral_lines.append(
+        f"    Part.CreateLine2 {x1:.6f}, {y1:.6f}, 0, {x2:.6f}, {y2:.6f}, 0"
+    )
+    spiral_block = "\n".join(spiral_lines)
 
-    macro = f"""' SolidWorks VBA Macro - Centrifugal Fan Volute
+    macro = f"""' SolidWorks Macro - Centrifugal Fan Volute (scroll casing)
 ' Matching impeller: D2={v.D2:.0f}mm  b2={v.b2:.0f}mm
-' Volute: B={v.B:.0f}mm  A={v.A:.0f}mm  delta={v.delta:.1f}mm
+' Volute: B={v.B:.0f}mm  A={v.A:.0f}mm  tongue gap={gap:.1f}mm
+' Recipes verified on SW2022 via cscript/VBS channel
 ' ============================================================
 
 Dim swApp As Object
 Dim Part As Object
 Dim skMgr As Object
 Dim featMgr As Object
-Dim boolStat As Boolean
+Dim extFeat As Object
+Dim cutFeat As Object
+Dim feat0 As Object
+Dim idx As Integer
 
 Sub main()
     Set swApp = Application.SldWorks
@@ -280,49 +299,33 @@ Sub main()
     Set skMgr = Part.SketchManager
     Set featMgr = Part.FeatureManager
 
-    ' ============================================================
-    ' Step 1: Volute outer wall profile (spline, Top Plane)
-    ' ============================================================
-    ' Switch to Top Plane
-    Part.Extension.SelectByID2 "Front Plane", "PLANE", 0, 0, 0, False, 0, Nothing, 0
+    ' === 1. Scroll outer wall: spiral polyline + closing radial line ===
+    skMgr.InsertSketch True
+{spiral_block}
     skMgr.InsertSketch True
 
-    ' Select the plane (already in sketch mode on Front)
-    
-    ' Draw outer profile as spline
-    Dim sp(0 To {n * 2 - 1}) As Double
-{spline_block}
+    Set extFeat = featMgr.FeatureExtrusion3(True, False, False, 6, 0, {v.B / 1000.0:.6f}, 0, False, False, False, False, 0, 0, False, False, False, False, True, True, True, 0, 0, False)
 
-    Dim splineWall As Object
-    Set splineWall = skMgr.CreateSpline(sp)
+    ' === 2. Impeller cavity: circle on front plane, cut through all ===
+    Set feat0 = Part.FirstFeature
+    idx = 0
+    Do While Not feat0 Is Nothing
+        If feat0.GetTypeName2 = "RefPlane" Then
+            idx = idx + 1
+            If idx = 1 Then Exit Do
+        End If
+        Set feat0 = feat0.GetNextFeature
+    Loop
+    If feat0 Is Nothing Then Exit Sub
+    feat0.Select2 False, 0
     skMgr.InsertSketch True
-    
-    ' Draw impeller clearance circle (R2 + delta)
-    skMgr.InsertSketch True
-    Part.CreateCircle2 0, 0, 0, {m(R2)}, 0, 0
+    Part.CreateCircle2 0, 0, 0, {R2 / 1000.0:.6f}, 0, 0
     skMgr.InsertSketch True
 
-    ' ============================================================
-    ' Step 2: Extrude volute body (width B={v.B:.0f}mm)
-    ' ============================================================
-    Part.ClearSelection2 True
-    ' Select the outer profile area for extrusion
-    ' (In practice: select the bounded region between outer wall and inner circle)
-    
-    boolStat = featMgr.FeatureExtrusion2( _
-        True, False, False, 0#, 0, 1, {m(v.B)}, 0, 0, 0, 0, True, _
-        0, 0#, 0#, 0, False, False)
+    Set cutFeat = featMgr.FeatureCut3(True, False, False, 1, 1, 0, 0, False, False, False, False, 0, 0, False, False, False, False, False, True, True, True, True, False, 0, 0, False)
 
-    ' ============================================================
-    ' Step 3: Cut inlet hole (diameter D0={v.D0:.0f}mm)
-    ' ============================================================
-    ' Select side face for sketch
-    ' Draw inlet circle
-    ' Cut-extrude through
-    
     Part.ViewZoomtofit2
-    MsgBox "Fan Volute D2={v.D2:.0f}mm  B={v.B:.0f}mm  A={v.A:.0f}mm", _
-           vbInformation, "solidworks-parametric"
+    MsgBox "Fan Volute D2={v.D2:.0f}mm  B={v.B:.0f}mm  A={v.A:.0f}mm", vbInformation, "sw-ai"
 End Sub
 """
     return macro

@@ -171,7 +171,6 @@ namespace SWAI
             this.tabAi.Text = "AI 对话 💬";
 
             // txtChatLog — 聊天记录
-            this.txtChatLog = new System.Windows.Forms.RichTextBox();
             this.txtChatLog.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.txtChatLog.BackColor = System.Drawing.Color.FromArgb(30, 30, 30);
             this.txtChatLog.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
@@ -186,7 +185,6 @@ namespace SWAI
             this.txtChatLog.Text = "";
 
             // txtChatInput — 输入框
-            this.txtChatInput = new System.Windows.Forms.TextBox();
             this.txtChatInput.AcceptsReturn = true;
             this.txtChatInput.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.txtChatInput.Font = new System.Drawing.Font("Microsoft YaHei", 10F);
@@ -200,7 +198,7 @@ namespace SWAI
             this.txtChatInput.KeyDown += new System.Windows.Forms.KeyEventHandler(this.TxtChatInput_KeyDown);
 
             // btnChatSend — 发送
-            this.btnChatSend = new System.Windows.Forms.Button();
+            this.btnChatSend.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
             this.btnChatSend.BackColor = System.Drawing.Color.FromArgb(0, 120, 212);
             this.btnChatSend.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnChatSend.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
@@ -214,7 +212,6 @@ namespace SWAI
             this.btnChatSend.Click += new System.EventHandler(this.BtnChatSend_Click);
 
             // btnChatSettings — 设置
-            this.btnChatSettings = new System.Windows.Forms.Button();
             this.btnChatSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnChatSettings.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.btnChatSettings.ForeColor = System.Drawing.Color.LightGray;
@@ -227,7 +224,6 @@ namespace SWAI
             this.btnChatSettings.Click += new System.EventHandler(this.BtnChatSettings_Click);
 
             // btnChatClear — 清空
-            this.btnChatClear = new System.Windows.Forms.Button();
             this.btnChatClear.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnChatClear.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.btnChatClear.ForeColor = System.Drawing.Color.LightGray;

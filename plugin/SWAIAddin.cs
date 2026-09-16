@@ -31,7 +31,30 @@ namespace SWAI
 
         #endregion
 
+        #region 诊断日志
+
+        private static readonly string LogPath = @"C:\ProgramData\SWAIPlugin\addin_load.log";
+
+        private static void Log(string msg)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(LogPath,
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " [pid " +
+                    System.Diagnostics.Process.GetCurrentProcess().Id + "] " + msg + "\r\n");
+            }
+            catch { }
+        }
+
+        #endregion
+
         #region ISwAddin 实现
+
+        /// <summary>COM 激活即记录（证明 CoCreateInstance 到达了我们的 DLL）</summary>
+        public SWAIAddin()
+        {
+            Log("SWAIAddin object CONSTRUCTED (COM activation reached our DLL)");
+        }
 
         /// <summary>
         /// 连接插件。SolidWorks 装载插件时自动调用。
@@ -43,18 +66,25 @@ namespace SWAI
         {
             try
             {
+                Log("ConnectToSW ENTRY, cookie=" + Cookie + ", caller=" +
+                    System.Diagnostics.Process.GetCurrentProcess().ProcessName);
                 _swApp = (SldWorks)ThisSW;
                 _addinId = Cookie;
+
+                // SolidWorks 插件握手：注册回调后插件管理器才认本插件（缺此步对话框勾选会被弹回）
+                _swApp.SetAddinCallbackInfo2(0, this, _addinId);
+                Log("handshake SetAddinCallbackInfo2 OK");
 
                 // 创建任务面板（核心 UI：AI 对话 + 手动模式）
                 CreateTaskPane();
 
                 _connected = true;
+                Log("ConnectToSW SUCCESS");
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[SWAI] Connect failed: " + ex.Message);
+                Log("ConnectToSW FAILED: " + ex);
                 return false;
             }
         }
@@ -87,6 +117,33 @@ namespace SWAI
 
         #region 任务面板管理
 
+        // 16x16 任务窗格图标（橙底白字"SW"，BMP格式base64；橙色区别于蓝(WorkBuddy)/绿(Pro)两插件）
+        private const string TaskPaneIconBase64 =
+            "Qk02AwAAAAAAADYAAAAoAAAAEAAAABAAAAABABgAAAAAAAADAAATCwAAEwsAAAAAAAAAAAAACnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnbo////////////CnboCnboCnbo////CnboCnboCnbo////CnboCnboCnboCnbo////CnboCnboCnbo////CnboCnbo////////Cnbo////////CnboCnboCnboCnboCnboCnboCnboCnbo////CnboCnbo////Cnbo////Cnbo////CnboCnboCnboCnboCnboCnbo////////////CnboCnboCnbo////Cnbo////Cnbo////CnboCnboCnboCnbo////CnboCnboCnboCnboCnboCnbo////CnboCnboCnbo////CnboCnboCnbo////CnboCnboCnbo////CnboCnbo////CnboCnboCnbo////CnboCnboCnboCnboCnbo////////////CnboCnboCnbo////CnboCnboCnbo////CnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnboCnbo";
+
+        /// <summary>
+        /// 释放内置图标到ProgramData，返回文件路径（失败返回null）
+        /// </summary>
+        private static string EnsureIconFile()
+        {
+            try
+            {
+                string dir = @"C:\ProgramData\SWAIPlugin";
+                if (!System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                string path = System.IO.Path.Combine(dir, "taskpane_icon.bmp");
+                byte[] icon = Convert.FromBase64String(TaskPaneIconBase64);
+                // 已存在且大小一致时跳过写入：SolidWorks可能占用该bmp导致覆写失败
+                if (!System.IO.File.Exists(path) || new System.IO.FileInfo(path).Length != icon.Length)
+                    System.IO.File.WriteAllBytes(path, icon);
+                return path;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         /// <summary>
         /// 创建任务面板（Task Pane）。
         /// 使用现代 API：CreateTaskpaneView2 + AddControl。
@@ -97,11 +154,13 @@ namespace SWAI
             {
                 _taskPane = new TaskPaneControl();
 
-                // 现代 API：创建任务窗格视图（空位图 + 提示）
-                _taskPaneView = _swApp.CreateTaskpaneView2("", "SWAI 🏭");
+                // 任务窗格图标：无图标时按钮不可见，必须提供16x16位图
+                string iconPath = EnsureIconFile();
+                Log("CreateTaskPane: iconPath=" + (iconPath ?? "<null>"));
+                _taskPaneView = _swApp.CreateTaskpaneView2(iconPath ?? "", "SWAI 参数化建模（法兰/风机）");
+                Log("CreateTaskpaneView2 returned " + (_taskPaneView == null ? "NULL" : "view"));
                 if (_taskPaneView == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[SWAI] CreateTaskpaneView2 returned null");
                     return;
                 }
 
@@ -109,14 +168,15 @@ namespace SWAI
                 object control = _taskPaneView.AddControl(
                     "SWAI.TaskPaneControl",
                     "");
+                Log("AddControl returned " + (control == null ? "NULL" : control.GetType().FullName));
                 if (control == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("[SWAI] AddControl returned null");
+                    Log("AddControl failed");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[SWAI] CreateTaskPane failed: " + ex.Message);
+                Log("CreateTaskPane EXCEPTION: " + ex);
             }
         }
 
