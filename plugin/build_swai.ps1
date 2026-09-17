@@ -5,7 +5,8 @@
 #
 # 步骤: 复制 Interop DLL → Roslyn 编译 → 部署到 Program Files → RegAsm 注册 → 写 AddIns 注册表
 $ErrorActionPreference = 'Stop'
-$proj = 'c:\Users\Administrator\Desktop\SOLO\sw-ai\plugin'
+# 脚本随仓库走：plugin 目录 = 本脚本所在目录
+$proj = Split-Path -Parent $MyInvocation.MyCommand.Path
 $csc = 'C:\ProgramData\SolidWorksAIPlugin\roslyn2\tools\csc.exe'
 $libs = Join-Path $proj 'libs'
 $outDir = Join-Path $proj 'bin\Release'

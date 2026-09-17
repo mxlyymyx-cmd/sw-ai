@@ -133,20 +133,20 @@ namespace SWAI
                 if (action == "build" && !string.IsNullOrEmpty(macro))
                 {
                     await Task.Delay(300);
-                    bool built = SwApiHelper.RunMacro(macro);
+                    bool built = await SwApiHelper.RunMacroAsync(macro);
                     AppendChat(built
                         ? "✅ 模型已自动生成！可在 SolidWorks 中查看。"
-                        : "⚠️ 宏已生成但执行失败，请在日志中查看原因（可能需调低宏安全性）",
+                        : "⚠️ 宏执行失败: " + SwApiHelper.LastMacroOutput,
                         built ? Color.FromArgb(144, 238, 144) : Color.Orange);
 
                     // 蜗壳宏（叶轮时附带）
                     if (!string.IsNullOrEmpty(extraMacro))
                     {
                         await Task.Delay(200);
-                        bool builtVolute = SwApiHelper.RunMacro(extraMacro);
+                        bool builtVolute = await SwApiHelper.RunMacroAsync(extraMacro);
                         AppendChat(builtVolute
                             ? $"✅ 蜗壳模型已自动生成！"
-                            : $"⚠️ 蜗壳宏执行失败 ({extraName})",
+                            : $"⚠️ 蜗壳宏执行失败 ({extraName}): " + SwApiHelper.LastMacroOutput,
                             builtVolute ? Color.FromArgb(144, 238, 144) : Color.Orange);
                     }
                 }

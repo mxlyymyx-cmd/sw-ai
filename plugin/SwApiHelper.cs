@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -176,75 +177,88 @@ namespace SWAI
 
         #endregion
 
-        #region VBA 宏执行
+        #region VBA 宏执行（cscript/VBS 通道）
+
+        /// <summary>
+        /// 最近一次宏执行的 cscript 输出（供 UI 日志展示）。
+        /// </summary>
+        public static string LastMacroOutput { get; private set; } = "";
+
+        /// <summary>
+        /// 在 SolidWorks 中执行 VBA 宏字符串（异步包装，不阻塞 UI 线程）。
+        /// </summary>
+        public static async Task<bool> RunMacroAsync(string code, string macroPath = null)
+        {
+            return await Task.Run(() => RunMacro(code, macroPath));
+        }
 
         /// <summary>
         /// 在 SolidWorks 中执行 VBA 宏字符串。
-        /// 
-        /// 将宏代码保存为临时文件，然后通过 SW API 运行。
+        ///
+        /// 通道：VBA -> VBS 转换 -> cscript.exe 外部执行（GetObject 连接运行中的 SW）。
+        /// 不使用 RunMacro2：它只接受 .swp/.swb 宏工程，无法打开裸 .bas
+        /// （会弹出"无法打开宏文件"；SW2022 E2E 实测，见 tools/vba_to_vbs.py）。
         /// </summary>
         /// <param name="code">VBA 宏代码</param>
-        /// <param name="macroPath">可选：指定宏文件路径（不传则使用临时文件）</param>
-        /// <returns>是否执行成功</returns>
+        /// <param name="macroPath">可选：指定输出路径（自动改后缀为 .vbs）</param>
+        /// <returns>是否执行成功（以 MACRO_DONE 哨兵判定）</returns>
         public static bool RunMacro(string code, string macroPath = null)
         {
             try
             {
-                var app = GetSwApp();
-                if (app == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("[SwApiHelper] RunMacro: SolidWorks not connected");
-                    return false;
-                }
+                string vbs = ConvertVbaToVbs(code);
 
-                // 写入临时文件
                 string tempPath = macroPath;
                 if (string.IsNullOrEmpty(tempPath))
                 {
-                    tempPath = Path.Combine(Path.GetTempPath(), "SWAI_TempMacro.bas");
+                    tempPath = Path.Combine(Path.GetTempPath(), "SWAI_TempMacro.vbs");
                 }
-
-                // 强制声明模块名为 Module1（VBA 从 .bas 导入时模块名默认取文件名，
-                // 与 RunMacro2 的模块参数不一致会导致找不到模块而执行失败）
-                string trimmed = code.TrimStart();
-                if (!trimmed.StartsWith("Attribute VB_Name", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    code = "Attribute VB_Name = \"Module1\"\r\n" + code;
+                    tempPath = Path.ChangeExtension(macroPath, ".vbs") ?? macroPath;
                 }
 
-                // 用 ANSI/系统代码页写入（VBA 按 ANSI 读取 .bas，UTF-8 会导致中文注释乱码）
-                File.WriteAllText(tempPath, code, System.Text.Encoding.Default);
+                // cscript 按 ANSI 读取 .vbs，用系统代码页写入
+                File.WriteAllText(tempPath, vbs, System.Text.Encoding.Default);
 
-                // 现代 API：RunMacro2(FilePath, Module, Proc, Options, out Error)
-                int macroError = 0;
-                bool result = app.RunMacro2(
-                    tempPath,
-                    "Module1",
-                    "main",
-                    (int)swRunMacroOption_e.swRunMacroUnloadAfterRun,
-                    out macroError);
-
-                if (!result)
+                var psi = new System.Diagnostics.ProcessStartInfo
                 {
-                    System.Diagnostics.Debug.WriteLine(
-                        "[SwApiHelper] RunMacro returned false (error " + macroError + "). " +
-                        "Check SW macro security settings (Tools → Macro → Security)");
-                }
+                    FileName = "cscript.exe",
+                    Arguments = "//nologo \"" + tempPath + "\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
 
-                return result;
+                using (var proc = System.Diagnostics.Process.Start(psi))
+                {
+                    string output = proc.StandardOutput.ReadToEnd();
+                    if (!proc.WaitForExit(300000))
+                    {
+                        try { proc.Kill(); } catch { }
+                        System.Diagnostics.Debug.WriteLine("[SwApiHelper] cscript timeout (300s)");
+                        LastMacroOutput = "cscript 超时（300s）";
+                        return false;
+                    }
+
+                    LastMacroOutput = output.Trim();
+                    System.Diagnostics.Debug.WriteLine("[SwApiHelper] cscript: " + LastMacroOutput);
+
+                    return LastMacroOutput.IndexOf("MACRO_DONE", StringComparison.Ordinal) >= 0;
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("[SwApiHelper] RunMacro failed: " + ex.Message);
+                LastMacroOutput = ex.Message;
                 return false;
             }
         }
 
         /// <summary>
-        /// 从已有 .bas 文件运行宏。
+        /// 从已有宏文件运行（.bas 源码或 .vbs 均可，统一走 VBS 通道）。
         /// </summary>
-        /// <param name="macroFilePath">宏文件路径</param>
-        /// <returns>是否执行成功</returns>
         public static bool RunMacroFile(string macroFilePath)
         {
             if (!File.Exists(macroFilePath))
@@ -253,8 +267,79 @@ namespace SWAI
                 return false;
             }
 
-            string code = File.ReadAllText(macroFilePath, System.Text.Encoding.UTF8);
+            string code = File.ReadAllText(macroFilePath, System.Text.Encoding.Default);
             return RunMacro(code, macroFilePath);
+        }
+
+        /// <summary>
+        /// VBA -> VBS 翻译器（与 tools/vba_to_vbs.py 规则一致，SW2022 E2E 实测配方）：
+        ///  1. 丢弃 Attribute / Option Explicit 行
+        ///  2. Application.SldWorks -> GetObject(, "SldWorks.Application")
+        ///  3. swApp.NewDocument(...) -> swApp.NewPart()   （外部 NewDocument("") 返回 Nothing）
+        ///  4. VBA 数字字面量后缀 0# / 1.5# / 2! -> 无后缀
+        ///  5. Dim x(0 To N) As T -> Dim x(N)；Dim x As T -> Dim x
+        ///  6. MsgBox / Debug.Print 语句（含 _ 续行）注释化
+        ///  7. Next i -> Next
+        ///  8. 尾部追加错误陷阱 + MACRO_DONE 哨兵
+        /// </summary>
+        private static string ConvertVbaToVbs(string vba)
+        {
+            var sb = new System.Text.StringBuilder();
+            bool inMsgbox = false;
+
+            foreach (var raw in vba.Replace("\r\n", "\n").Split('\n'))
+            {
+                string s = raw.TrimEnd();
+
+                if (inMsgbox)
+                {
+                    sb.AppendLine("' [swai] " + s);
+                    if (!s.TrimEnd().EndsWith("_")) inMsgbox = false;
+                    continue;
+                }
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\s*Attribute\s+VB_Name")) continue;
+                if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\s*Option\s+Explicit")) continue;
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\s*MsgBox\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                {
+                    sb.AppendLine("' [swai] " + s);
+                    if (s.TrimEnd().EndsWith("_")) inMsgbox = true;
+                    continue;
+                }
+
+                string t = s;
+                t = System.Text.RegularExpressions.Regex.Replace(
+                    t, @"Application\.SldWorks", "GetObject(, \"SldWorks.Application\")");
+                t = System.Text.RegularExpressions.Regex.Replace(
+                    t, @"swApp\.NewDocument\s*\([^)]*\)", "swApp.NewPart()");
+                t = System.Text.RegularExpressions.Regex.Replace(t, @"(\d(?:\.\d+)?)\s*[#!]", "$1");
+                t = System.Text.RegularExpressions.Regex.Replace(
+                    t, @"Dim\s+(\w+)\s*\(\s*\d+\s+To\s+(\d+)\s*\)\s+As\s+\w+",
+                    "Dim $1($2)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                t = System.Text.RegularExpressions.Regex.Replace(
+                    t, @"Dim\s+(\w+)\s+As\s+\w+", "Dim $1", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                t = System.Text.RegularExpressions.Regex.Replace(
+                    t, @"^(\s*)Next\s+\w+\s*$", "$1Next", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (System.Text.RegularExpressions.Regex.IsMatch(t, @"^\s*Debug\.Print", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                {
+                    t = "' [swai] " + t;
+                }
+
+                sb.AppendLine(t);
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("On Error Resume Next");
+            sb.AppendLine("main");
+            sb.AppendLine("If Err.Number <> 0 Then");
+            sb.AppendLine("    WScript.Echo \"MACRO_ERROR \" & Err.Number & \": \" & Err.Description");
+            sb.AppendLine("    WScript.Quit 1");
+            sb.AppendLine("End If");
+            sb.AppendLine("WScript.Echo \"MACRO_DONE\"");
+
+            return sb.ToString();
         }
 
         #endregion
