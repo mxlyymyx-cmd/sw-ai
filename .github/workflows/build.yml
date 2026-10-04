@@ -23,6 +23,7 @@ jobs:
       - name: 📦 安装依赖
         run: |
           pip install -r requirements.txt
+          pip install -r requirements-plugin.txt
           pip install pyinstaller pytest
 
       - name: ✅ 单元测试（417 项）
