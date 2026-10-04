@@ -36,11 +36,11 @@ Python API 服务器 (api.py)
 ### Step 1: 安装 Python 依赖并启动 API 服务器
 
 ```bash
-cd projects/solidworks-parametric
+cd <仓库根目录>
 pip install -r requirements-plugin.txt
 
 # 启动 API 服务器（保持运行）
-python api.py --port 5757
+python app/api.py --port 5757
 ```
 
 终端应显示：
@@ -79,7 +79,7 @@ set SWAI_LLM_API_KEY=sk-你的key
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-cd projects\solidworks-parametric\plugin
+cd plugin
 .\install.ps1
 ```
 
@@ -93,7 +93,7 @@ cd projects\solidworks-parametric\plugin
 以 **管理员身份** 打开 Developer Command Prompt for VS 2022：
 
 ```cmd
-cd projects\solidworks-parametric\plugin
+cd plugin
 msbuild SWAIAddin.csproj /p:Configuration=Release /p:Platform=x64
 regasm /codebase bin\x64\Release\SWAIAddin.dll
 ```
@@ -195,7 +195,7 @@ System.Diagnostics.Debug.WriteLine("[SWAI] 调试信息");
 查看 API 服务器日志：
 
 ```bash
-python api.py --port 5757 --debug
+python app/api.py --port 5757 --debug
 ```
 
 ## 文件结构
