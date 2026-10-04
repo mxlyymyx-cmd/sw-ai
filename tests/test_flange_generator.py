@@ -9,14 +9,14 @@ import math
 
 import pytest
 
-from e2e_flange import analytic_volume_mm3, revolve_volume_mm3
-from flange.gb_standards import lookup
-from flange.generator import (
+from cad.e2e_flange import analytic_volume_mm3, revolve_volume_mm3
+from swai.flange.gb_standards import lookup
+from swai.flange.generator import (
     _bolt_hole_geometry,
     _flange_profile,
     generate_sw_macro,
 )
-from flange.params import FlangeType
+from swai.flange.params import FlangeType
 
 ALL_TYPES = ["plate", "slip_on", "weld_neck", "blind"]
 

@@ -24,25 +24,25 @@ import re
 import sys
 from typing import Optional
 
-# 确保可导入引擎包
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 仓库根加入 sys.path：直接运行本脚本时可导入 swai/app 包
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flange.params import FlangeType, SealType
-from flange.gb_standards import lookup, is_supported
-from flange.generator import generate_sw_macro as gen_flange_macro
-from flange.ai_extractor import extract as flange_extract
+from swai.flange.params import FlangeType, SealType
+from swai.flange.gb_standards import lookup, is_supported
+from swai.flange.generator import generate_sw_macro as gen_flange_macro
+from swai.flange.ai_extractor import extract as flange_extract
 
-from impeller.params import ImpellerDesignInput
-from impeller.design import design_impeller as design_impeller_engine
-from impeller.generator import generate_vba_macro as gen_impeller_macro
-from impeller.volute import match_impeller, volute_profile
-from impeller.volute import generate_vba_macro as gen_volute_macro
+from swai.impeller.params import ImpellerDesignInput
+from swai.impeller.design import design_impeller as design_impeller_engine
+from swai.impeller.generator import generate_vba_macro as gen_impeller_macro
+from swai.impeller.volute import match_impeller, volute_profile
+from swai.impeller.volute import generate_vba_macro as gen_volute_macro
 
-from axial.params import AxialFanInput
-from axial.design import design_axial_fan as design_axial_engine
-from axial.generator import generate_vba_macro as gen_axial_macro
+from swai.axial.params import AxialFanInput
+from swai.axial.design import design_axial_fan as design_axial_engine
+from swai.axial.generator import generate_vba_macro as gen_axial_macro
 
-from fan_selector import select_fan
+from app.fan_selector import select_fan
 
 log = logging.getLogger("swai.chat")
 

@@ -15,7 +15,7 @@
   5. 推荐最优方案，附全部候选对比表
 
 用法:
-    from fan_selector import select_fan
+    from app.fan_selector import select_fan
     sel = select_fan(Q=20000, P=800)
     print(sel.summary)
     print(sel.best.design.summary)   # 完整设计结果
@@ -25,10 +25,10 @@ import math
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
-from impeller.params import ImpellerDesignInput, ImpellerDesignResult
-from impeller.design import design_impeller
-from axial.params import AxialFanInput, AxialFanResult
-from axial.design import design_axial_fan
+from swai.impeller.params import ImpellerDesignInput, ImpellerDesignResult
+from swai.impeller.design import design_impeller
+from swai.axial.params import AxialFanInput, AxialFanResult
+from swai.axial.design import design_axial_fan
 
 # 标准电机转速（异步电机额定转速，r/min）
 STANDARD_SPEEDS = [2900, 1450, 960, 730, 580]

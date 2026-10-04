@@ -41,28 +41,28 @@ import sys
 import os
 import argparse
 
-# 确保可以导入本包
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 仓库根加入 sys.path：直接运行本脚本时可导入 swai/app 包
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flange.params import FlangeParams, FlangeType
-from flange.gb_standards import lookup, list_available, is_supported
-from flange.ai_extractor import extract
-from flange.pipeline import FlangePipeline, batch_auto
-from flange.generator import generate_sw_macro
+from swai.flange.params import FlangeParams, FlangeType
+from swai.flange.gb_standards import lookup, list_available, is_supported
+from swai.flange.ai_extractor import extract
+from swai.flange.pipeline import FlangePipeline, batch_auto
+from swai.flange.generator import generate_sw_macro
 
-from impeller.params import ImpellerDesignInput, BladeType
-from impeller.design import design_impeller, calc_ns, recommend_speed
-from impeller.blades import generate_blade_profile, generate_3d_blade, export_csv, export_sw_curve, CurveType
-from impeller.generator import generate_vba_macro as gen_impeller_macro, design_and_generate
-from impeller.volute import match_impeller, volute_profile, generate_vba_macro as gen_volute_macro
+from swai.impeller.params import ImpellerDesignInput, BladeType
+from swai.impeller.design import design_impeller, calc_ns, recommend_speed
+from swai.impeller.blades import generate_blade_profile, generate_3d_blade, export_csv, export_sw_curve, CurveType
+from swai.impeller.generator import generate_vba_macro as gen_impeller_macro, design_and_generate
+from swai.impeller.volute import match_impeller, volute_profile, generate_vba_macro as gen_volute_macro
 
-from axial.params import AxialFanInput, AirfoilType as AxialAirfoilType, CirculationType
-from axial.design import design_axial_fan, calc_ns as axial_calc_ns, estimate_diameter
-from axial.blades import generate_blade_points, export_csv as axial_export_csv, export_sw_curve as axial_export_sw_curve
-from axial.generator import generate_vba_macro as gen_axial_macro, design_and_generate as axial_design_and_generate
+from swai.axial.params import AxialFanInput, AirfoilType as AxialAirfoilType, CirculationType
+from swai.axial.design import design_axial_fan, calc_ns as axial_calc_ns, estimate_diameter
+from swai.axial.blades import generate_blade_points, export_csv as axial_export_csv, export_sw_curve as axial_export_sw_curve
+from swai.axial.generator import generate_vba_macro as gen_axial_macro, design_and_generate as axial_design_and_generate
 
-from fan_selector import select_fan
-from perf import perf_curve
+from app.fan_selector import select_fan
+from app.perf import perf_curve
 
 
 def cmd_query(args):
@@ -336,8 +336,8 @@ def cmd_axial_design(args):
             print(f"\n📜 Axial macro: {import_path}")
 
             # 导出叶型曲线
-            from axial.blades import generate_blade_points as gbp
-            from axial.blades import export_sw_curve as esc
+            from swai.axial.blades import generate_blade_points as gbp
+            from swai.axial.blades import export_sw_curve as esc
             pts = gbp(design.sections, design.airfoil, n_per_section=20)
             curve_path = os.path.join(args.macro_dir, f"{safe}.sldcrv")
             esc(pts, curve_path)
@@ -360,7 +360,7 @@ def cmd_axial_design(args):
 
 def cmd_interactive(args):
     """交互模式 — 支持法兰、离心叶轮和轴流风机"""
-    from impeller.params import BladeType as BT
+    from swai.impeller.params import BladeType as BT
     pipe = FlangePipeline()
 
     print("=" * 60)

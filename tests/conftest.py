@@ -1,4 +1,4 @@
-"""pytest 配置 — 将仓库根目录加入 sys.path（模块平铺在根目录）"""
+"""pytest 配置 — 将仓库根目录加入 sys.path（swai/ 与 app/ 包在仓库根下）"""
 
 import sys
 from pathlib import Path

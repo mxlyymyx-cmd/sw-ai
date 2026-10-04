@@ -16,10 +16,10 @@ import os
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flange.gb_standards import lookup
-from flange.generator import _flange_profile, _bolt_hole_geometry
+from swai.flange.gb_standards import lookup
+from swai.flange.generator import _flange_profile, _bolt_hole_geometry
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs")
 VBS_PATH = os.path.join(OUT_DIR, "e2e_flange.vbs")

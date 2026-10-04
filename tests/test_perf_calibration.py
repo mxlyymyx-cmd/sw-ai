@@ -17,7 +17,7 @@ import math
 
 import pytest
 
-from perf import (
+from app.perf import (
     AXIAL_STALL_X,
     _X_STALL,
     _eta_ratio,
@@ -25,10 +25,10 @@ from perf import (
     _psi_shape_centrifugal,
     perf_curve,
 )
-from impeller.design import design_impeller
-from impeller.params import BladeType, ImpellerDesignInput
-from axial.design import design_axial_fan
-from axial.params import AxialFanInput
+from swai.impeller.design import design_impeller
+from swai.impeller.params import BladeType, ImpellerDesignInput
+from swai.axial.design import design_axial_fan
+from swai.axial.params import AxialFanInput
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -7,7 +7,7 @@ AI 聊天引擎测试 — 正则降级模式（无 LLM / 无网络 / 无 SolidWo
 
 import pytest
 
-from ai_chat import chat, parse_llm_json
+from app.ai_chat import chat, parse_llm_json
 
 
 def _chat(text):

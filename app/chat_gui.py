@@ -20,9 +20,9 @@ from tkinter import ttk, messagebox, scrolledtext, filedialog
 
 import requests
 
-# 确保 PyInstaller 打包时收集到服务模块（api.py 会连带收集 flange/impeller/axial）
-import api  # noqa: F401
-import ai_chat  # noqa: F401
+# 确保 PyInstaller 打包时收集到服务模块（app.api 会连带收集 swai 三包）
+import app.api as api  # noqa: F401
+import app.ai_chat as ai_chat  # noqa: F401
 
 API_BASE = "http://127.0.0.1:5757"
 CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "SWAI")
@@ -60,7 +60,7 @@ def start_server_thread():
     """内嵌启动 Flask AI 服务（仅当端口未被占用时）。"""
     def _run():
         try:
-            import api
+            import app.api as api
             api.app.run(host="127.0.0.1", port=5757, debug=False, use_reloader=False)
         except Exception as e:
             sys.stderr.write(f"[SWAI] 服务启动失败: {e}\n")

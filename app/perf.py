@@ -15,7 +15,7 @@
   - SVG 图表导出（P-Q 与 η-Q 双曲线，标注设计点与失速区）
 
 用法:
-    from perf import perf_curve
+    from app.perf import perf_curve
     curve = perf_curve(design_result)
     print(curve.summary)
     curve.export_csv("fan_curve.csv")
@@ -27,8 +27,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Union
 
-from impeller.params import ImpellerDesignResult, BladeType
-from axial.params import AxialFanResult
+from swai.impeller.params import ImpellerDesignResult, BladeType
+from swai.axial.params import AxialFanResult
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -439,10 +439,10 @@ if __name__ == "__main__":
     import os
     os.makedirs("outputs", exist_ok=True)
 
-    from impeller.design import design_impeller
-    from impeller.params import ImpellerDesignInput
-    from axial.design import design_axial_fan
-    from axial.params import AxialFanInput
+    from swai.impeller.design import design_impeller
+    from swai.impeller.params import ImpellerDesignInput
+    from swai.axial.design import design_axial_fan
+    from swai.axial.params import AxialFanInput
 
     print("── 离心风机性能曲线 ──")
     d = design_impeller(ImpellerDesignInput(Q=5000, P=2500, n=2900))

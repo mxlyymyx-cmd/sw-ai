@@ -16,39 +16,39 @@ import logging
 import traceback
 from typing import Optional
 
-# 确保可以导入本包
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 仓库根加入 sys.path：直接运行本脚本时可导入 swai/app 包
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 # ── 设计引擎导入 ──
-from flange.params import FlangeParams, FlangeType, SealType
-from flange.gb_standards import lookup, list_available, is_supported
-from flange.ai_extractor import extract as flange_extract
-from flange.generator import generate_sw_macro as gen_flange_macro
+from swai.flange.params import FlangeParams, FlangeType, SealType
+from swai.flange.gb_standards import lookup, list_available, is_supported
+from swai.flange.ai_extractor import extract as flange_extract
+from swai.flange.generator import generate_sw_macro as gen_flange_macro
 
-from impeller.params import ImpellerDesignInput, BladeType
-from impeller.design import design_impeller as design_impeller_engine
-from impeller.generator import (
+from swai.impeller.params import ImpellerDesignInput, BladeType
+from swai.impeller.design import design_impeller as design_impeller_engine
+from swai.impeller.generator import (
     generate_vba_macro as gen_impeller_macro,
     design_and_generate as impeller_design_and_generate,
 )
-from impeller.volute import match_impeller, volute_profile
+from swai.impeller.volute import match_impeller, volute_profile
 
-from axial.params import AxialFanInput, AirfoilType
-from axial.design import design_axial_fan as design_axial_engine
-from axial.generator import (
+from swai.axial.params import AxialFanInput, AirfoilType
+from swai.axial.design import design_axial_fan as design_axial_engine
+from swai.axial.generator import (
     generate_vba_macro as gen_axial_macro,
     design_and_generate as axial_design_and_generate,
 )
 
 # ── AI 聊天引擎 ──
-from ai_chat import chat as ai_chat, is_llm_configured, get_llm_settings
+from app.ai_chat import chat as ai_chat, is_llm_configured, get_llm_settings
 
 # ── 选型 + 性能曲线 ──
-from fan_selector import select_fan
-from perf import perf_curve
+from app.fan_selector import select_fan
+from app.perf import perf_curve
 
 # ═══════════════════════════════════════════════════════════════
 # Flask App
@@ -768,7 +768,7 @@ def generate_macro():
                 try:
                     vol = match_impeller(design)
                     profile = volute_profile(vol)
-                    from impeller.volute import generate_vba_macro as gen_vol_macro
+                    from swai.impeller.volute import generate_vba_macro as gen_vol_macro
                     volute_macro = gen_vol_macro(vol, profile)
                 except Exception:
                     volute_macro = None

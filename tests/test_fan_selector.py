@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from fan_selector import (
+from app.fan_selector import (
     STANDARD_SPEEDS,
     calc_ns,
     select_fan,

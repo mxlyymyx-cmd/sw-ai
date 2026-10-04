@@ -10,13 +10,13 @@
 
 import pytest
 
-from flange.gb_standards import (
+from swai.flange.gb_standards import (
     SUPPORTED_PN,
     is_supported,
     list_available,
     lookup,
 )
-from flange.params import FlangeParams, FlangeType
+from swai.flange.params import FlangeParams, FlangeType
 
 ALL_TYPES = ["plate", "slip_on", "weld_neck", "blind"]
 ALL_DNS = [10, 15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300]
