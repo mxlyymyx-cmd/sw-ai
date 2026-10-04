@@ -9,9 +9,10 @@ SWAI AI 聊天引擎
 - 闲聊/设计咨询 → AI 直接回答
 
 LLM 配置（优先级：环境变量 > config.json）：
-    MECHFORGE_LLM_API_KEY  /  config.json  "llm_api_key"
-    MECHFORGE_LLM_API_URL  /  config.json  "llm_api_url"   (默认 DeepSeek)
-    MECHFORGE_LLM_MODEL    /  config.json  "llm_model"     (默认 deepseek-chat)
+    SWAI_LLM_API_KEY  /  config.json  "llm_api_key"
+    SWAI_LLM_API_URL  /  config.json  "llm_api_url"   (默认 DeepSeek)
+    SWAI_LLM_MODEL    /  config.json  "llm_model"     (默认 deepseek-chat)
+    （旧前缀 MECHFORGE_LLM_* 仍兼容读取，下一个次要版本移除）
 
 无 API Key 时自动降级为正则提取 + 模板回复（功能可用，但对话能力有限）。
 """
@@ -77,9 +78,9 @@ def get_llm_settings() -> dict:
     """获取 LLM 配置（环境变量优先，其次 config.json）。"""
     cfg = _load_config()
     return {
-        "api_key": os.environ.get("MECHFORGE_LLM_API_KEY") or cfg.get("llm_api_key", ""),
-        "api_url": os.environ.get("MECHFORGE_LLM_API_URL") or cfg.get("llm_api_url", DEFAULT_API_URL),
-        "model": os.environ.get("MECHFORGE_LLM_MODEL") or cfg.get("llm_model", DEFAULT_MODEL),
+        "api_key": os.environ.get("SWAI_LLM_API_KEY") or os.environ.get("MECHFORGE_LLM_API_KEY") or cfg.get("llm_api_key", ""),
+        "api_url": os.environ.get("SWAI_LLM_API_URL") or os.environ.get("MECHFORGE_LLM_API_URL") or cfg.get("llm_api_url", DEFAULT_API_URL),
+        "model": os.environ.get("SWAI_LLM_MODEL") or os.environ.get("MECHFORGE_LLM_MODEL") or cfg.get("llm_model", DEFAULT_MODEL),
     }
 
 

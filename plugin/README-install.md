@@ -65,7 +65,7 @@ API Base:  http://127.0.0.1:5757/api
 
 **方式三：环境变量**
 ```cmd
-set MECHFORGE_LLM_API_KEY=sk-你的key
+set SWAI_LLM_API_KEY=sk-你的key
 ```
 
 > 💡 不配置也能用：自动降级为正则解析模式（能识别标准参数格式，但多轮对话体验弱）。
