@@ -2,12 +2,13 @@ name: Build Plugin Installer
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "v2" ]
+    tags: [ "v*" ]
     paths:
       - "plugin/**"
       - ".github/workflows/plugin-build.yml"
-      - "api.py"
-      - "ai_chat.py"
+      - "app/**"
+      - "swai/**"
       - "requirements-plugin.txt"
   workflow_dispatch:
 
@@ -126,8 +127,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           # --onefile 单文件模式 + --noconsole 隐藏控制台窗口（服务静默后台运行）
           pyinstaller --onefile --noconsole --name SWAIServer --clean --noconfirm `
+            --paths . `
             --hidden-import flask --hidden-import flask_cors --hidden-import requests `
-            api.py
+            app\api.py
           if (!(Test-Path "dist\SWAIServer.exe")) {
             Write-Host "❌ PyInstaller 打包 SWAIServer 失败"
             exit 1
@@ -139,10 +141,11 @@ jobs:
         run: |
           # 聊天 GUI：双击打开就是正常对话界面，自动拉起本地服务
           pyinstaller --onefile --noconsole --name SWAIChat --clean --noconfirm `
+            --paths . `
             --hidden-import flask --hidden-import flask_cors --hidden-import requests `
-            --hidden-import api --hidden-import ai_chat `
-            --collect-submodules flange --collect-submodules impeller --collect-submodules axial `
-            chat_gui.py
+            --hidden-import app.api --hidden-import app.ai_chat `
+            --collect-submodules swai.flange --collect-submodules swai.impeller --collect-submodules swai.axial `
+            app\chat_gui.py
           if (!(Test-Path "dist\SWAIChat.exe")) {
             Write-Host "❌ PyInstaller 打包 SWAIChat 失败"
             exit 1
@@ -173,16 +176,16 @@ jobs:
         run: |
           Get-ChildItem dist\* -Recurse | ForEach-Object { Write-Host "  📦 $($_.FullName) ($($_.Length / 1KB) KB)" }
 
-      - name: 🚀 发布 Release（公开下载，匿名可拿）
+      - name: 🚀 发布 Release（仅打 tag 时发布，避免分支 push 重发旧版）
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.2
-          name: SW-AI v1.0.2
+          tag_name: ${{ github.ref_name }}
+          name: SW-AI ${{ github.ref_name }}
           body: |
-            🔧 根治插件不显示：
-            - 移除 RegAsm 依赖（普通电脑没有 .NET SDK，RegAsm.exe 不存在导致 COM 注册静默失败）
-            - 安装包直接手写注册表（32位+64位视图全写）
-            - 插件 DLL 改 AnyCPU（32/64 位 SolidWorks 通吃）
+            SW-AI ${{ github.ref_name }} 发布版。
+            - SWAI-Setup-*.exe：双击安装（SolidWorks 插件 + AI 服务 + 聊天窗口）
+            - 变更说明见仓库 docs/ 与提交历史
           files: dist/SWAI-Setup-*.exe
           fail_on_unmatched_files: true
 
