@@ -172,7 +172,7 @@ def _regex_intent(messages: list) -> dict:
 
     # 闲聊/知识问答检测
     if not any(kw in text for kw in ["设计", "画", "建模", "生成", "做个", "法兰", "风机", "叶轮",
-                                     "dn", "pn", "流量", "全压", "转速"]):
+                                     "dn", "pn", "流量", "全压", "转速", "选型"]):
         return {"intent": "chat", "type": "", "params": {}, "missing": [],
                 "reply": "我是 SWAI 机械设计助手，可以帮你设计法兰、离心风机叶轮、轴流风机。"
                          "例如：\"设计一台离心风机 Q=5000 P=2500 n=1450\" 或 \"DN100 PN16 平焊法兰\"。"}
