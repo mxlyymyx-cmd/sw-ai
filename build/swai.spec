@@ -7,7 +7,7 @@ SWAI 是 CLI 工具（非 GUI），默认带命令行窗口。
 使用说明：
   1. 在 Windows 上装好 Python 3.12+
   2. pip install -r requirements.txt
-  3. pyinstaller --noconfirm build/mech_forge.spec
+  3. pyinstaller --noconfirm build/swai.spec
   4. 成品在 dist/SWAI.exe
 """
 import sys
@@ -25,20 +25,20 @@ DATAS = []
 
 # ── 隐式导入 ──
 HIDDEN_IMPORTS = [
-    "flange.params",
-    "flange.gb_standards",
-    "flange.ai_extractor",
-    "flange.generator",
-    "flange.pipeline",
-    "impeller.design",
-    "impeller.params",
-    "impeller.blades",
-    "impeller.generator",
-    "impeller.volute",
-    "axial.design",
-    "axial.params",
-    "axial.blades",
-    "axial.generator",
+    "swai.flange.params",
+    "swai.flange.gb_standards",
+    "swai.flange.ai_extractor",
+    "swai.flange.generator",
+    "swai.flange.pipeline",
+    "swai.impeller.design",
+    "swai.impeller.params",
+    "swai.impeller.blades",
+    "swai.impeller.generator",
+    "swai.impeller.volute",
+    "swai.axial.design",
+    "swai.axial.params",
+    "swai.axial.blades",
+    "swai.axial.generator",
 ]
 
 # ── 排除 ──
@@ -54,7 +54,7 @@ EXCLUDES = [
 ]
 
 a = Analysis(
-    [str(PROJECT_ROOT / "main.py")],
+    [str(PROJECT_ROOT / "app" / "main.py")],
     pathex=[
         str(PROJECT_ROOT),
     ],

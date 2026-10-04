@@ -50,8 +50,8 @@ pip install -r requirements-plugin.txt -q 2>nul
 pip install pyinstaller -q 2>nul
 if not exist dist mkdir dist
 pyinstaller --onefile --name SWAIServer --clean --noconfirm ^
-    --hidden-import flask --hidden-import flask_cors --hidden-import requests ^
-    api.py
+    --hidden-import flask --hidden-import flask_cors --hidden-import requests --paths . ^
+    apppi.py
 if errorlevel 1 (
     echo [❌] PyInstaller 打包失败
     pause & exit /b 1

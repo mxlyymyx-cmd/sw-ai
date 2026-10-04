@@ -30,7 +30,7 @@ jobs:
 
       - name: 🔨 打包 SWAI.exe
         run: |
-          pyinstaller --noconfirm build/mech_forge.spec
+          pyinstaller --noconfirm build/swai.spec
 
       - name: 📦 压缩为 ZIP
         shell: pwsh

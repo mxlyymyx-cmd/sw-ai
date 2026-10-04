@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swai-engine"
+version = "1.1.0.dev0"
+description = "SWAI 参数化设计引擎 — 法兰/离心叶轮/轴流风机设计计算（闭环验证 + 性能曲线实测标定）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "mxlyymyx-cmd" }]
+keywords = ["solidworks", "parametric", "flange", "impeller", "axial-fan", "cad", "gb-standards"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Scientific/Engineering :: Mechanical Engineering",
+]
+dependencies = [
+    # flange.ai_extractor 的 LLM 参数提取（无 key 时自动降级正则模式）
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# SolidWorks COM 驱动：三个生成器对 win32com 均为延迟导入，
+# 不装也能做全部设计计算与测试，只有真机生成 3D 模型时需要
+com = ["pywin32>=306"]
+
+[tool.setuptools]
+# 只打包引擎三包；app/（服务/GUI/CLI）与 cad/（E2E 脚本）留在仓库内不发布
+packages = ["swai", "swai.flange", "swai.impeller", "swai.axial"]
