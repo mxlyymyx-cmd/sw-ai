@@ -55,7 +55,9 @@ from perf import perf_curve
 # ═══════════════════════════════════════════════════════════════
 
 app = Flask(__name__)
-CORS(app)  # 跨域支持
+# 仅允许本机来源跨域：SolidWorks 插件是 C# HttpClient，不走 CORS 不受影响；
+# 收紧是为了防浏览器里任意网页跨域调用本机 API（消耗 LLM key、批量取宏代码）
+CORS(app, origins=[r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?"])
 
 # 日志配置
 logging.basicConfig(
