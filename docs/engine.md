@@ -1,6 +1,6 @@
 # 引擎详解（swai/）
 
-> 引擎三包 5,751 行 Python，344 项离线单元测试守护。本文是各模块的设计方法、闭环验证与测试覆盖明细。
+> 引擎三包 5,751 行 Python，417 项离线单元测试守护。本文是各模块的设计方法、闭环验证与测试覆盖明细。
 
 ---
 
@@ -64,17 +64,21 @@
 
 ---
 
-## 🧪 测试覆盖（344 项，纯离线，<1s）
+## 🧪 测试覆盖（417 项，纯离线，<1s）
 
 | 测试文件 | 内容 | 数量 |
 |----------|------|------|
 | `test_flange_standards.py` | 4 类型 × 4 PN × DN10-300 全表几何不变量 + 关键规格 spot check | 253 |
+| `test_api.py` | Flask test client 全 12 端点：正常/4xx/CORS 收敛/宏任务存取 | 44 |
 | `test_flange_generator.py` | 半剖轮廓结构、螺栓孔几何、SolidWorks E2E 体积基准回归 | 42 |
+| `test_cli.py` | main.py 各子命令 handler 进程内直测 + dispatch 端到端 | 25 |
 | `test_fan_selector.py` | 比转速公式、6 类典型工况选型、评分排序、prefer 强制机型 | 17 |
 | `test_perf_calibration.py` | 性能曲线标定点回归（4-72/9-19/轴流样本点偏差） | 16 |
 | `test_ai_chat.py` | 正则模式意图识别、4 类法兰参数提取、转速缺省自动选型、LLM JSON 解析 | 16 |
+| `test_gui_smoke.py` | GUI 模块导入/结构冒烟（无头环境） | 4 |
 
 体积基准值来自 SolidWorks 2022 实测（校验脚本 `cad/e2e_flange.py`），几何回归 = 解析解逐位对比。
+API/CLI/GUI 测试由 conftest 的 autouse 夹具强制离线（清空 LLM key 来源），不触网、不碰 COM。
 
 ## 📊 项目统计（v2 结构）
 
@@ -83,7 +87,7 @@
 | 引擎 `swai/` | 5,751 行 |
 | 应用 `app/`（API/对话/GUI/CLI/选型/曲线） | 3,127 行 |
 | 真机脚本 `cad/` | 343 行 |
-| 测试 `tests/` | 856 行 / 344 项 |
+| 测试 `tests/` | 1,426 行 / 417 项 |
 | C# 插件 `plugin/` | 1,918 行 |
 | 法兰规格 | 240（4 类型 × PN10/16/25/40 × DN10-300） |
 | 叶轮叶型 | 5（前向/径向/径向出口/后向/机翼型） |

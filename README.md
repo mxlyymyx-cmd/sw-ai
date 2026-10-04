@@ -4,7 +4,7 @@
 >
 > 「你说规格，AI 画图」
 
-SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自然语言规格到 SolidWorks 3D 模型的完整自动化流程。涵盖法兰、离心风机叶轮、轴流风机、风机选型、性能曲线五个模块，每个设计模块都包含独立的设计计算引擎（含闭环验证）和 SolidWorks COM API 建模能力。全仓库 344 项离线单元测试，CI 打包前强制通过。
+SWAI 是一个面向机械设计的 AI 参数化建模工具集，支持从自然语言规格到 SolidWorks 3D 模型的完整自动化流程。涵盖法兰、离心风机叶轮、轴流风机、风机选型、性能曲线五个模块，每个设计模块都包含独立的设计计算引擎（含闭环验证）和 SolidWorks COM API 建模能力。全仓库 417 项离线单元测试，CI 打包前强制通过。
 
 > 📦 v2 起仓库分层：**`swai/` 引擎**（可 `pip install`）/ **`app/` 应用**（服务/聊天/CLI）/ **`cad/` 真机脚本**。引擎计算代码与 v1.0.2 逐字节一致，由测试守护。
 
@@ -148,7 +148,7 @@ pip install pytest
 python -m pytest tests/ -q          # 全量运行，约 0.5s
 ```
 
-**344 项单元测试，纯离线**（不需要 SolidWorks / LLM / 网络）。测试覆盖明细与引擎各模块的验证方法（欧拉闭环 / E2E 体积基准 / 实测标定）见 [docs/engine.md](docs/engine.md)；SolidWorks 宏通道的演进史与真机实测记录见 [docs/macro-channel.md](docs/macro-channel.md)。
+**417 项单元测试，纯离线**（不需要 SolidWorks / LLM / 网络）。测试覆盖明细与引擎各模块的验证方法（欧拉闭环 / E2E 体积基准 / 实测标定）见 [docs/engine.md](docs/engine.md)；SolidWorks 宏通道的演进史与真机实测记录见 [docs/macro-channel.md](docs/macro-channel.md)。
 
 **CI**：`.github/workflows/build.yml`（SWAI.exe 打包）与 `plugin-build.yml`（插件安装包）在打包前强制跑 `pytest`，测试不过不放行；安装包 Release 仅在打 tag 时发布。
 
