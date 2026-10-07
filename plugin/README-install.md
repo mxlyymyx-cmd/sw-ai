@@ -129,7 +129,7 @@ regasm /unregister bin\x64\Release\SWAIAddin.dll
 ### 清理 SolidWorks 注册项
 
 ```cmd
-reg delete "HKLM\SOFTWARE\SolidWorks\AddIns\{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}" /f
+reg delete "HKLM\SOFTWARE\SolidWorks\AddIns\{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}" /f
 ```
 
 ### 删除文件

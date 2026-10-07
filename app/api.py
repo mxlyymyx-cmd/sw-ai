@@ -104,7 +104,7 @@ def health():
     log.info("GET /api/health")
     return ok({
         "status": "ok",
-        "version": "1.1.0",
+        "version": "1.1.1",
         "engines": ["flange", "impeller", "axial", "select", "curve"],
     })
 

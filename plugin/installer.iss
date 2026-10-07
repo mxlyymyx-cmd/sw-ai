@@ -6,14 +6,14 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SW-AI"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "SWAI"
 #define MyAppURL "https://github.com/mxlyymyx-cmd/sw-ai"
 #define MyAppExeName "SWAIAddin.dll"
 #define MyServerExeName "SWAIServer.exe"
 
 ; 插件 COM GUID（必须与 SWAIAddin.cs 中 [Guid] 一致）
-#define PluginGUID "{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}"
+#define PluginGUID "{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"
 
 [Setup]
 AppId={{8F3B2A1C-4D5E-4F6A-9B7C-1D2E3F4A5B6C}
@@ -59,15 +59,15 @@ Source: "README-install.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 [Registry]
 ; ── SolidWorks 插件注册表（SolidWorks 主程序是 32 位，读取 32 位视图 WOW6432Node）──
 ; HKLM32 = HKLM\SOFTWARE\WOW6432Node（SolidWorks 实际读取的位置）
-Root: HKLM32; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\SolidWorks\AddIns\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\SolidWorks\AddIns\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
 ; HKCU 32 位视图（部分 SolidWorks 版本读 HKCU）
-Root: HKCU32; Subkey: "Software\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
-Root: HKCU32; Subkey: "Software\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
-Root: HKCU32; Subkey: "Software\SolidWorks\AddinsStartup\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: dword; ValueName: ""; ValueData: 1; Flags: uninsdeletekey
+Root: HKCU32; Subkey: "Software\SolidWorks\AddIns\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU32; Subkey: "Software\SolidWorks\AddIns\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
+Root: HKCU32; Subkey: "Software\SolidWorks\AddinsStartup\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: dword; ValueName: ""; ValueData: 1; Flags: uninsdeletekey
 ; 64 位视图也写入（双保险，对 32 位 SolidWorks 无害）
-Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: dword; ValueName: "LoadAtStartup"; ValueData: 1; Flags: uninsdeletekey
 
 ; ── COM 注册（RegAsm 等价物，Inno 手写注册表）──
 ; 为什么不用 RegAsm：RegAsm.exe 属于 .NET Framework SDK/Developer Pack，
@@ -75,21 +75,21 @@ Root: HKLM64; Subkey: "SOFTWARE\SolidWorks\AddIns\{{A1B2C3D4-E5F6-7890-ABCD-EF12
 ; 这里手写 RegAsm /codebase 的全部关键键值，32 位 + 64 位视图都写，
 ; 32 位/64 位 SolidWorks 都能找到。
 ; ── 32 位 COM 视图 ──
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "SW-AI"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "mscoree.dll"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Both"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Assembly"; ValueData: "SWAIAddin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Class"; ValueData: "SWAI.SWAIAddin"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "CodeBase"; ValueData: "file:///{app}/SWAIAddin.dll"; Flags: uninsdeletekey
-Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\ProgId"; ValueType: string; ValueName: ""; ValueData: "SWAI.Addin"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: string; ValueName: ""; ValueData: "SW-AI"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "mscoree.dll"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Both"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "Assembly"; ValueData: "SWAIAddin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "Class"; ValueData: "SWAI.SWAIAddin"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "CodeBase"; ValueData: "file:///{app}/SWAIAddin.dll"; Flags: uninsdeletekey
+Root: HKLM32; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\ProgId"; ValueType: string; ValueName: ""; ValueData: "SWAI.Addin"; Flags: uninsdeletekey
 ; ── 64 位 COM 视图 ──
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}"; ValueType: string; ValueName: ""; ValueData: "SW-AI"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "mscoree.dll"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Both"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Assembly"; ValueData: "SWAIAddin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "Class"; ValueData: "SWAI.SWAIAddin"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\InprocServer32"; ValueType: string; ValueName: "CodeBase"; ValueData: "file:///{app}/SWAIAddin.dll"; Flags: uninsdeletekey
-Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{A1B2C3D4-E5F6-7890-ABCD-EF1234567891}}\ProgId"; ValueType: string; ValueName: ""; ValueData: "SWAI.Addin"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}"; ValueType: string; ValueName: ""; ValueData: "SW-AI"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "mscoree.dll"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Both"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "Assembly"; ValueData: "SWAIAddin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "Class"; ValueData: "SWAI.SWAIAddin"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\InprocServer32"; ValueType: string; ValueName: "CodeBase"; ValueData: "file:///{app}/SWAIAddin.dll"; Flags: uninsdeletekey
+Root: HKLM64; Subkey: "SOFTWARE\Classes\CLSID\{{2694E5EC-F7AB-486D-AE69-A5D354FD42AA}\ProgId"; ValueType: string; ValueName: ""; ValueData: "SWAI.Addin"; Flags: uninsdeletekey
 
 ; ── 开机自启 API 服务 ──
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SWAIServer"; ValueData: """{app}\{#MyServerExeName}"""; Flags: uninsdeletevalue; Tasks: autostart

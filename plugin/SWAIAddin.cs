@@ -13,7 +13,7 @@ namespace SWAI
     ///   regasm /codebase SWAIAddin.dll
     ///   或在安装时由安装程序自动注册。
     /// </summary>
-    [Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567891")]
+    [Guid("2694E5EC-F7AB-486D-AE69-A5D354FD42AA")]
     [ComVisible(true)]
     [ProgId("SWAI.Addin")]
     public class SWAIAddin : ISwAddin

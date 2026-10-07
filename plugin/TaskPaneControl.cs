@@ -20,7 +20,7 @@ namespace SWAI
     /// </summary>
     [ComVisible(true)]
     [ProgId("SWAI.TaskPaneControl")]
-    [Guid("A1B2C3D4-E5F6-7890-ABCD-EF1234567892")]
+    [Guid("A909538A-056F-493B-9B23-2C6693797429")]
     public partial class TaskPaneControl : UserControl
     {
         #region 字段

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "swai-engine"
-version = "1.1.0"
+version = "1.1.1"
 description = "SWAI 参数化设计引擎 — 法兰/离心叶轮/轴流风机设计计算（闭环验证 + 性能曲线实测标定）"
 readme = "README.md"
 requires-python = ">=3.9"
