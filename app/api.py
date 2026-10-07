@@ -865,6 +865,12 @@ def get_macro(task_id: str):
 def main():
     import argparse
 
+    # 与 app/main.py 同款 GBK 防护：--noconsole 打包下 stdout 若是管道（GBK），
+    # 启动横幅带 emoji 会 UnicodeEncodeError；无头（None）时自动跳过
+    for _stream in (sys.stdout, sys.stderr):
+        if _stream is not None and hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(errors="replace")
+
     parser = argparse.ArgumentParser(description="SWAI API Server")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址 (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=5757, help="监听端口 (default: 5757)")

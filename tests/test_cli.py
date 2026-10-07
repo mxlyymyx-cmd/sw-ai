@@ -199,3 +199,20 @@ def test_main_no_args_prints_help_exits(monkeypatch, capsys):
     assert e.value.code == 1
     out = capsys.readouterr().out
     assert "用法" in out or "usage" in out.lower()
+
+
+def test_main_survives_gbk_console(monkeypatch):
+    """回归：打包 exe 在 GBK 控制台输出 emoji 曾 UnicodeEncodeError 崩溃。
+
+    main() 应把控制台流降级为 errors=replace——emoji 变 ?，中文不受影响。
+    """
+    import io
+
+    buf = io.BytesIO()
+    monkeypatch.setattr(sys, "argv", ["main.py", "query", "100", "16"])
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(buf, encoding="gbk"))
+    m.main()
+    sys.stdout.flush()  # TextIOWrapper 有内部缓冲，不 flush 读不到
+    out = buf.getvalue().decode("gbk")
+    assert "DN100" in out
+    assert "?" in out  # 📐 被降级为占位符而非崩溃

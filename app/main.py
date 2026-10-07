@@ -446,6 +446,12 @@ def _parse_fan_input(text: str) -> dict:
 
 
 def main():
+    # 中文 Windows 控制台默认 GBK：输出带 emoji（📐📜 等）会 UnicodeEncodeError，
+    # 打包 exe 在真机必现（CI 只构建不运行，测不出来）。降级为占位符而非崩溃。
+    for _stream in (sys.stdout, sys.stderr):
+        if _stream is not None and hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(errors="replace")
+
     parser = argparse.ArgumentParser(
         description="SolidWorks 参数化设计 — 机械行业 AI 自动化",
         formatter_class=argparse.RawDescriptionHelpFormatter,
